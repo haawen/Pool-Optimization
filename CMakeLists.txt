@@ -11,6 +11,7 @@ set(SOURCES
     src/pool.c
 )
 
+add_library(pool_shared SHARED ${SOURCES})
 add_executable(pool src/main.c ${SOURCES})
 
 include_directories(${UNITY_DIR})
