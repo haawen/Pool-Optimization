@@ -23,6 +23,8 @@ add_executable(pool_tests
     ${SOURCES}
 )
 
+if(UNIX)
 target_link_libraries(pool m)
 target_link_libraries(pool_shared m)
 target_link_libraries(pool_tests m)
+endif()

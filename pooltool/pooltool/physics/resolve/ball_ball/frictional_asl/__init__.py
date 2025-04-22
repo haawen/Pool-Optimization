@@ -17,7 +17,7 @@ from pooltool.physics.resolve.models import BallBallModel
 
 from ctypes import CDLL, POINTER
 from ctypes import c_size_t, c_double, c_char_p, c_float, c_int
-LIBRARY_PATH = "../build/libpool_shared.so"
+LIBRARY_PATH = r"C:\Users\karto\team52\build\Debug\pool_shared.dll"
 
 asl_lib = CDLL(LIBRARY_PATH)
 
@@ -140,6 +140,16 @@ def _collide_balls(
             - Updated angular velocity vector of ball 2 after collision in global
               coordinates.
     """
+    print("\n=== Starting Python Implementation ===")
+    print("Python Initial State - Ball 1:")
+    print("  Position:", r_i[0], r_i[1], r_i[2])
+    print("  Velocity:", v_i[0], v_i[1], v_i[2])
+    print("  Angular: ", w_i[0], w_i[1], w_i[2])
+    
+    print("\nPython Initial State - Ball 2:")
+    print("  Position:", r_j[0], r_j[1], r_j[2])
+    print("  Velocity:", v_j[0], v_j[1], v_j[2])
+    print("  Angular: ", w_j[0], w_j[1], w_j[2])
 
     r_ij = r_j - r_i
     r_ij_mag_sqrd = dot(r_ij, r_ij)
@@ -147,11 +157,19 @@ def _collide_balls(
     y_loc = r_ij / r_ij_mag
     x_loc = np.cross(y_loc, Z_LOC)
 
-    print(x_loc)
+    print("\nPython Local Coordinate System:")
+    print("  x_loc (right):", x_loc[0], x_loc[1], x_loc[2])
+    print("  y_loc (forward):", y_loc[0], y_loc[1], y_loc[2])
+    
     
     G = np.vstack((x_loc, y_loc, Z_LOC))
     v_ix, v_iy = dot(v_i, x_loc), dot(v_i, y_loc)
     v_jx, v_jy = dot(v_j, x_loc), dot(v_j, y_loc)
+
+    print("\nPython Initial Local Velocities:")
+    print("  Ball 1: v_ix =", v_ix, ", v_iy =", v_iy)
+    print("  Ball 2: v_jx =", v_jx, ", v_jy =", v_jy)
+
     w_ix, w_iy, w_iz = dot(G, w_i)
     w_jx, w_jy, w_jz = dot(G, w_j)
     u_iR_x, u_iR_y = v_ix + R * w_iy, v_iy - R * w_ix
@@ -246,12 +264,25 @@ def _collide_balls(
     # END OF RESTITUTION PHASE
     # niters = %d
     # ''', niters)
+    print("\nPython Final Local Velocities:")
+    print("  Ball 1: v_ix =", v_ix, ", v_iy =", v_iy)
+    print("  Ball 2: v_jx =", v_jx, ", v_jy =", v_jy)
     v_i = array((v_ix, v_iy, 0))
     v_j = array((v_jx, v_jy, 0))
     w_i = array((w_ix, w_iy, w_iz))
     w_j = array((w_jx, w_jy, w_jz))
     G_T = G.T
-    return dot(G_T, v_i), dot(G_T, w_i), dot(G_T, v_j), dot(G_T, w_j)
+
+    result_v_i = dot(G_T, v_i)
+    result_v_j = dot(G_T, v_j)
+    result_w_i = dot(G_T, w_i)
+    result_w_j = dot(G_T, w_j)
+
+    print("\nPython Final Global Velocities:")
+    print("  Ball 1:", result_v_i[0], result_v_i[1], result_v_i[2])
+    print("  Ball 2:", result_v_j[0], result_v_j[1], result_v_j[2])
+    print("\n=== End Python Implementation ===")
+    return result_v_i, result_w_i, result_v_j, result_w_j
 
 
 @attrs.define
