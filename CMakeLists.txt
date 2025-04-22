@@ -9,6 +9,7 @@ include_directories(tests)
 
 set(SOURCES
     src/pool.c
+    src/math_helper.c
 )
 
 add_library(pool_shared SHARED ${SOURCES})
@@ -21,3 +22,7 @@ add_executable(pool_tests
     ${UNITY_DIR}/unity.c
     ${SOURCES}
 )
+
+target_link_libraries(pool m)
+target_link_libraries(pool_shared m)
+target_link_libraries(pool_tests m)

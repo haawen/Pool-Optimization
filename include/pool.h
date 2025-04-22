@@ -1,8 +1,14 @@
 #ifndef POOL_H
 #define POOL_H
 
-#include <stdint.h>
+#ifdef _WIN32
+    #define DLL_EXPORT __declspec(dllexport)
+#else
+    #define DLL_EXPORT
+#endif
 
+
+    #include <stdint.h>
 
 // Class Ball defined
 // https://github.com/ekiefl/pooltool/blob/main/pooltool/objects/ball/datatypes.py#L321
@@ -10,32 +16,54 @@
 // Class BallState
 // https://github.com/ekiefl/pooltool/blob/main/pooltool/objects/ball/datatypes.py#L70
 
-enum MotionState{
-    stationary = 0,
-    spinning = 1,
-    sliding = 2,
-    rolling = 3,
-    pocketed = 4
-};
+DLL_EXPORT void hello_world(const char* matrix_name, double* rvw);
 
-typedef struct BallState {
-    float rvw[9];
-    enum MotionState state;
-    float time;
-} BallState;
+/*
+def collide_balls(
+    rvw1: NDArray[np.float64],
+    rvw2: NDArray[np.float64],
+    R: float,
+    M: float,
+    u_s1: float = 0.21,
+    u_s2: float = 0.21,
+    u_b: float = 0.05,
+    e_b: float = 0.89,
+    deltaP: Optional[float] = None,
+    N: int = 1000,
+) -> Tuple[NDArray[np.float64], NDArray[np.float64]]:
+ */
 
-void hello_world(const char* matrix_name, double* rvw);
+ /*
+    rvw1:
+        Kinematic state of ball 1 (see
+        :class:`pooltool.objects.ball.datatypes.BallState`).
+    rvw2:
+        Kinematic state of ball 2 (see
+        :class:`pooltool.objects.ball.datatypes.BallState`).
+    R: Radius of the balls.
+    M: Mass of the balls.
+    u_s1: Coefficient of sliding friction between ball 1 and the surface.
+    u_s2: Coefficient of sliding friction between ball 2 and the surface.
+    u_b: Coefficient of friction between the balls during collision.
+    e_b: Coefficient of restitution between the balls.
+    deltaP:
+        Normal impulse step size. If not passed, automatically selected according to
+        Equation 14 in the reference.
+    N:
+        If deltaP is not specified, it is calculated such that approximately this
+        number of iterations are performed (see Equation 14 in reference). If deltaP
+        is not None, this does nothing.
+ */
+DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double* rvw1_result, double* rvw2_result);
 
 /* Assuming rvw is row-major (passed from pooltool) */
-float* get_displacement(BallState* ballState);
+double* get_displacement(double* rvw);
 
 /* Assuming rvw is row-major (passed from pooltool) */
-float* get_velocity(BallState* ballState);
+double* get_velocity(double* rvw);
 
 /* Assuming rvw is row-major (passed from pooltool) */
-float* get_angular_velocity(BallState* ballState);
-
-void collide_balls();
+double* get_angular_velocity(double* rvw);
 
 
 #endif

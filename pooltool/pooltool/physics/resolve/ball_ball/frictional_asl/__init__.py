@@ -16,19 +16,34 @@ from pooltool.physics.resolve.ball_ball.friction import (
 from pooltool.physics.resolve.models import BallBallModel
 
 from ctypes import CDLL, POINTER
-from ctypes import c_size_t, c_double, c_char_p
-
+from ctypes import c_size_t, c_double, c_char_p, c_float, c_int
 LIBRARY_PATH = "../build/libpool_shared.so"
 
 asl_lib = CDLL(LIBRARY_PATH)
 
-ND_POINTER_1 = np.ctypeslib.ndpointer(dtype=np.float64, ndim=1, flags="C")
+ND_POINTER_1 = np.ctypeslib.ndpointer(dtype=np.float64, ndim=1, flags="C_CONTIGUOUS")
 
 asl_lib.hello_world.argtypes = [
     c_char_p,
     ND_POINTER_1,
 ]
 asl_lib.hello_world.restype = None
+
+asl_lib.collide_balls.argtypes = [
+    ND_POINTER_1,  # rvw1
+    ND_POINTER_1,  # rvw2
+    c_float,       # R
+    c_float,       # M
+    c_float,       # u_s1
+    c_float,       # u_s2
+    c_float,       # u_b
+    c_float,       # e_b
+    c_float,       # deltaP
+    c_int,         # N
+    ND_POINTER_1,  # rvw1_result
+    ND_POINTER_1,  # rvw2_result
+]
+asl_lib.collide_balls.restype = None
 
 INF = float("inf")
 Z_LOC = array([0, 0, 1], dtype=np.float64)
@@ -76,6 +91,9 @@ def collide_balls(
     r_i, v_i, w_i = rvw1.copy()
     r_j, v_j, w_j = rvw2.copy()
 
+    rvw_result_1 = np.empty(9, dtype=np.float64)
+    rvw_result_2 = np.empty(9, dtype=np.float64)
+
     v_i1, w_i1, v_j1, w_j1 = _collide_balls(
         r_i, v_i, w_i, r_j, v_j, w_j, R, M, u_s1, u_s2, u_b, e_b, deltaP, N
     )
@@ -84,6 +102,9 @@ def collide_balls(
     rvw2[1, :2] = v_j1[:2]
     rvw1[2] = w_i1
     rvw2[2] = w_j1
+
+    asl_lib.collide_balls(rvw1.flatten(), rvw2.flatten(), R, M, u_s1, u_s2, u_b, e_b, deltaP if deltaP is not None else 0, N, rvw_result_1, rvw_result_2)
+
     return rvw1, rvw2
 
 
@@ -125,6 +146,9 @@ def _collide_balls(
     r_ij_mag = sqrt(r_ij_mag_sqrd)
     y_loc = r_ij / r_ij_mag
     x_loc = np.cross(y_loc, Z_LOC)
+
+    print(x_loc)
+    
     G = np.vstack((x_loc, y_loc, Z_LOC))
     v_ix, v_iy = dot(v_i, x_loc), dot(v_i, y_loc)
     v_jx, v_jy = dot(v_j, x_loc), dot(v_j, y_loc)
@@ -289,8 +313,8 @@ class FrictionalASL(CoreBallBallCollision):
             N=self.num_iterations,
         )
 
-        asl_lib.hello_world(b"Ball 1", rvw1.flatten())
-        asl_lib.hello_world(b"Ball 2", rvw2.flatten())
+        # asl_lib.hello_world(b"Ball 1", rvw1.flatten())
+        # asl_lib.hello_world(b"Ball 2", rvw2.flatten())
 
         ball1.state = BallState(rvw1, const.sliding)
         ball2.state = BallState(rvw2, const.sliding)
