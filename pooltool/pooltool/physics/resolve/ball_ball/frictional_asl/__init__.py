@@ -17,7 +17,16 @@ from pooltool.physics.resolve.models import BallBallModel
 
 from ctypes import CDLL, POINTER
 from ctypes import c_size_t, c_double, c_char_p, c_float, c_int
-LIBRARY_PATH = r"C:\Users\karto\team52\build\Debug\pool_shared.dll"
+
+import platform
+
+if platform.system() == "Windows":
+    LIBRARY_PATH = r"C:\Users\karto\team52\build\Debug\pool_shared.dll"
+elif platform.system() == "Linux":
+    LIBRARY_PATH = "../build/libpool_shared.so"
+else:
+    raise NotImplementedError("Please add the path to your system")
+
 
 asl_lib = CDLL(LIBRARY_PATH)
 
@@ -32,14 +41,14 @@ asl_lib.hello_world.restype = None
 asl_lib.collide_balls.argtypes = [
     ND_POINTER_1,  # rvw1
     ND_POINTER_1,  # rvw2
-    c_float,       # R
-    c_float,       # M
-    c_float,       # u_s1
-    c_float,       # u_s2
-    c_float,       # u_b
-    c_float,       # e_b
-    c_float,       # deltaP
-    c_int,         # N
+    c_float,  # R
+    c_float,  # M
+    c_float,  # u_s1
+    c_float,  # u_s2
+    c_float,  # u_b
+    c_float,  # e_b
+    c_float,  # deltaP
+    c_int,  # N
     ND_POINTER_1,  # rvw1_result
     ND_POINTER_1,  # rvw2_result
 ]
@@ -103,7 +112,20 @@ def collide_balls(
     rvw1[2] = w_i1
     rvw2[2] = w_j1
 
-    asl_lib.collide_balls(rvw1.flatten(), rvw2.flatten(), R, M, u_s1, u_s2, u_b, e_b, deltaP if deltaP is not None else 0, N, rvw_result_1, rvw_result_2)
+    asl_lib.collide_balls(
+        rvw1.flatten(),
+        rvw2.flatten(),
+        R,
+        M,
+        u_s1,
+        u_s2,
+        u_b,
+        e_b,
+        deltaP if deltaP is not None else 0,
+        N,
+        rvw_result_1,
+        rvw_result_2,
+    )
 
     return rvw1, rvw2
 
@@ -145,7 +167,7 @@ def _collide_balls(
     print("  Position:", r_i[0], r_i[1], r_i[2])
     print("  Velocity:", v_i[0], v_i[1], v_i[2])
     print("  Angular: ", w_i[0], w_i[1], w_i[2])
-    
+
     print("\nPython Initial State - Ball 2:")
     print("  Position:", r_j[0], r_j[1], r_j[2])
     print("  Velocity:", v_j[0], v_j[1], v_j[2])
@@ -160,8 +182,7 @@ def _collide_balls(
     print("\nPython Local Coordinate System:")
     print("  x_loc (right):", x_loc[0], x_loc[1], x_loc[2])
     print("  y_loc (forward):", y_loc[0], y_loc[1], y_loc[2])
-    
-    
+
     G = np.vstack((x_loc, y_loc, Z_LOC))
     v_ix, v_iy = dot(v_i, x_loc), dot(v_i, y_loc)
     v_jx, v_jy = dot(v_j, x_loc), dot(v_j, y_loc)
