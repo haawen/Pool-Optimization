@@ -107,14 +107,13 @@ def collide_balls(
         r_i, v_i, w_i, r_j, v_j, w_j, R, M, u_s1, u_s2, u_b, e_b, deltaP, N
     )
 
-    rvw1[1, :2] = v_i1[:2]
-    rvw2[1, :2] = v_j1[:2]
-    rvw1[2] = w_i1
-    rvw2[2] = w_j1
+    import sys
+
+    sys.stdout.flush()
 
     asl_lib.collide_balls(
-        rvw1.flatten(),
-        rvw2.flatten(),
+        rvw1.copy().flatten(),
+        rvw2.copy().flatten(),
         R,
         M,
         u_s1,
@@ -126,6 +125,37 @@ def collide_balls(
         rvw_result_1,
         rvw_result_2,
     )
+
+    v_i1_C_code = rvw_result_1[3:6]
+    w_i1_C_code = rvw_result_1[6:]
+
+    v_j1_C_code = rvw_result_2[3:6]
+    w_j1_C_code = rvw_result_2[6:]
+
+    if not np.allclose(v_i1, v_i1_C_code, atol=0.001):
+        print("WARNING: v_i1 and v_i1_C_code are too dissimilar!")
+        print("v_i1:", v_i1)
+        print("v_i1_C_code:", v_i1_C_code)
+
+    if not np.allclose(w_i1, w_i1_C_code, atol=0.001):
+        print("WARNING: w_i1 and w_i1_C_code are too dissimilar!")
+        print("w_i1:", w_i1)
+        print("w_i1_C_code:", w_i1_C_code)
+
+    if not np.allclose(v_j1, v_j1_C_code, atol=0.001):
+        print("WARNING: v_j1 and v_j1_C_code are too dissimilar!")
+        print("v_j1:", v_j1)
+        print("v_j1_C_code:", v_j1_C_code)
+
+    if not np.allclose(w_j1, w_j1_C_code, atol=0.001):
+        print("WARNING: w_j1 and w_j1_C_code are too dissimilar!")
+        print("w_j1:", w_j1)
+        print("w_j1_C_code:", w_j1_C_code)
+
+    rvw1[1, :2] = v_i1_C_code[:2]
+    rvw2[1, :2] = v_j1_C_code[:2]
+    rvw1[2] = w_i1_C_code
+    rvw2[2] = w_j1_C_code
 
     return rvw1, rvw2
 
@@ -163,6 +193,8 @@ def _collide_balls(
               coordinates.
     """
     print("\n=== Starting Python Implementation ===")
+
+    """
     print("Python Initial State - Ball 1:")
     print("  Position:", r_i[0], r_i[1], r_i[2])
     print("  Velocity:", v_i[0], v_i[1], v_i[2])
@@ -172,6 +204,7 @@ def _collide_balls(
     print("  Position:", r_j[0], r_j[1], r_j[2])
     print("  Velocity:", v_j[0], v_j[1], v_j[2])
     print("  Angular: ", w_j[0], w_j[1], w_j[2])
+    """
 
     r_ij = r_j - r_i
     r_ij_mag_sqrd = dot(r_ij, r_ij)
@@ -182,6 +215,7 @@ def _collide_balls(
     print("\nPython Local Coordinate System:")
     print("  x_loc (right):", x_loc[0], x_loc[1], x_loc[2])
     print("  y_loc (forward):", y_loc[0], y_loc[1], y_loc[2])
+    print("  z_loc (up):", Z_LOC[0], Z_LOC[1], Z_LOC[2])
 
     G = np.vstack((x_loc, y_loc, Z_LOC))
     v_ix, v_iy = dot(v_i, x_loc), dot(v_i, y_loc)
@@ -193,13 +227,26 @@ def _collide_balls(
 
     w_ix, w_iy, w_iz = dot(G, w_i)
     w_jx, w_jy, w_jz = dot(G, w_j)
+
+    print("\nPython Initial Local Angular Velocities:")
+    print("  Ball 1: w_ix =", w_ix, ", w_iy =", w_iy, ", w_iz =", w_iz)
+    print("  Ball 2: w_jx =", w_jx, ", w_jy =", w_jy, ", w_jz =", w_jz)
+
     u_iR_x, u_iR_y = v_ix + R * w_iy, v_iy - R * w_ix
     u_jR_x, u_jR_y = v_jx + R * w_jy, v_jy - R * w_jx
     u_iR_xy_mag = sqrt(u_iR_x**2 + u_iR_y**2)
     u_jR_xy_mag = sqrt(u_jR_x**2 + u_jR_y**2)
+
+    print("\nPython Contact Point Velocity Magnitude:")
+    print("  Ball 1: u_iR_xy_mag=", u_iR_xy_mag)
+    print("  Ball 2: u_jR_xy_mag=", u_jR_xy_mag)
+
     u_ijC_x = v_ix - v_jx - R * (w_iz + w_jz)
     u_ijC_z = R * (w_ix + w_jx)
     u_ijC_xz_mag = sqrt(u_ijC_x**2 + u_ijC_z**2)
+
+    print("\nPython Contact Point Slide, Spin:")
+    print("  Contact Point: u_ijC_xz_mag=", u_ijC_xz_mag)
     v_ijy = v_jy - v_iy
     if deltaP is None:
         deltaP = 0.5 * (1 + e_b) * M * abs(v_ijy) / N
@@ -235,6 +282,7 @@ def _collide_balls(
                     else:
                         deltaP_ix = u_s1 * (u_iR_x / u_iR_xy_mag) * deltaP_2
                         deltaP_iy = u_s1 * (u_iR_y / u_iR_xy_mag) * deltaP_2
+
         # calc velocity changes:
         deltaV_ix = (deltaP_1 + deltaP_ix) / M
         deltaV_iy = (-deltaP + deltaP_iy) / M
@@ -285,9 +333,15 @@ def _collide_balls(
     # END OF RESTITUTION PHASE
     # niters = %d
     # ''', niters)
+    print("Finished in ", niters, "iters")
     print("\nPython Final Local Velocities:")
     print("  Ball 1: v_ix =", v_ix, ", v_iy =", v_iy)
     print("  Ball 2: v_jx =", v_jx, ", v_jy =", v_jy)
+
+    print("\nPython Final Local Angular Velocities:")
+    print("  Ball 1: w_ix =", w_ix, ", w_iy =", w_iy, ", w_iz =", w_iz)
+    print("  Ball 2: w_jx =", w_jx, ", w_jy =", w_jy, ", w_jz =", w_jz)
+
     v_i = array((v_ix, v_iy, 0))
     v_j = array((v_jx, v_jy, 0))
     w_i = array((w_ix, w_iy, w_iz))
@@ -302,6 +356,10 @@ def _collide_balls(
     print("\nPython Final Global Velocities:")
     print("  Ball 1:", result_v_i[0], result_v_i[1], result_v_i[2])
     print("  Ball 2:", result_v_j[0], result_v_j[1], result_v_j[2])
+
+    print("\nPython Final Global Angular Velocities:")
+    print("  Ball 1:", result_w_i[0], result_w_i[1], result_w_i[2])
+    print("  Ball 2:", result_w_j[0], result_w_j[1], result_w_j[2])
     print("\n=== End Python Implementation ===")
     return result_v_i, result_w_i, result_v_j, result_w_j
 
