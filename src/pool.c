@@ -80,26 +80,26 @@ DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, floa
     // Calculate velocity at contact point
     // = Calculate ball-table slips?
     // Slip refers to relative motion between two surfaces in contact — here, the ball and the table.
-    double velocity_at_contact_point_x_1 = local_velocity_x_1 + R * local_angular_velocity_y_1;
-    double velocity_at_contact_point_y_1 = local_velocity_y_1 - R * local_angular_velocity_x_1;
-    double velocity_at_contact_point_x_2 = local_velocity_x_2 + R * local_angular_velocity_y_2;
-    double velocity_at_contact_point_y_2 = local_velocity_y_2 - R * local_angular_velocity_x_2;
+    // Its the velocity at the contact point of the table and the ball
+    double surface_velocity_x_1 = local_velocity_x_1 + R * local_angular_velocity_y_1;
+    double surface_velocity_y_1 = local_velocity_y_1 - R * local_angular_velocity_x_1;
+    double surface_velocity_x_2 = local_velocity_x_2 + R * local_angular_velocity_y_2;
+    double surface_velocity_y_2 = local_velocity_y_2 - R * local_angular_velocity_x_2;
 
-    double contact_point_velocity_magnitude_1 = sqrt(velocity_at_contact_point_x_1 * velocity_at_contact_point_x_1 + velocity_at_contact_point_y_1 * velocity_at_contact_point_y_1);
-    double contact_point_velocity_magnitude_2 = sqrt(velocity_at_contact_point_x_2 * velocity_at_contact_point_x_2 + velocity_at_contact_point_y_2 * velocity_at_contact_point_y_2);
+    double surface_velocity_magnitude_1 = sqrt(surface_velocity_x_1 * surface_velocity_x_1 + surface_velocity_y_1 * surface_velocity_y_1);
+    double surface_velocity_magnitude_2 = sqrt(surface_velocity_x_2 * surface_velocity_x_2 + surface_velocity_y_2 * surface_velocity_y_2);
 
-    printf("\nC Contact Point Velocity Magnitude:\n");
-    printf("  Ball 1: u_iR_xy_mag= %.6f\n", contact_point_velocity_magnitude_1);
-    printf("  Ball 2: u_jR_xy_mag= %.6f\n", contact_point_velocity_magnitude_2);
+    printf("\nC Table Contact Point Velocity Magnitude:\n");
+    printf("  Ball 1: u_iR_xy_mag= %.6f\n", surface_velocity_magnitude_1);
+    printf("  Ball 2: u_jR_xy_mag= %.6f\n", surface_velocity_magnitude_2);
 
     // Relative surface velocity in the x-direction at the point where the two balls are in contact.
-    // TODO: better naming compared to velocity_at_contact_point, a bit confusing...
     // ball-ball slip
-    double contact_point_sliding_velocity_x = local_velocity_x_1 - local_velocity_x_2 - R * (local_angular_velocity_z_1 + local_angular_velocity_z_2);
-    double contact_point_spin_velocity_z = R * (local_angular_velocity_x_1 + local_angular_velocity_x_2);
-    double contact_point_sliding_spin_magnitude = sqrt(contact_point_sliding_velocity_x * contact_point_sliding_velocity_x + contact_point_spin_velocity_z * contact_point_spin_velocity_z);
+    double contact_point_velocity_x = local_velocity_x_1 - local_velocity_x_2 - R * (local_angular_velocity_z_1 + local_angular_velocity_z_2);
+    double contact_point_velocity_z = R * (local_angular_velocity_x_1 + local_angular_velocity_x_2);
+    double ball_ball_contact_point_magnitude = sqrt(contact_point_velocity_x * contact_point_velocity_x + contact_point_velocity_z * contact_point_velocity_z);
     printf("\nC Contact Point Slide, Spin:\n");
-    printf("  Contact Point: u_ijC_xz_mag= %.6f\n", contact_point_sliding_spin_magnitude);
+    printf("  Contact Point: u_ijC_xz_mag= %.6f\n", ball_ball_contact_point_magnitude);
 
     // Main collision loop
     double velocity_diff_y = local_velocity_y_2 - local_velocity_y_1;
@@ -117,6 +117,7 @@ DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, floa
 
     int niter = 0;
 
+    // TODO: better naming for deltas
     // Delta impulse overall per ball?
     double deltaP_1 = deltaP;
     double deltaP_2 = deltaP;
@@ -130,7 +131,7 @@ DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, floa
     while (velocity_diff_y < 0 || total_work < work_required) {
 
         // Impulse Calculation
-        if (contact_point_sliding_spin_magnitude < 1e-16) {
+        if (ball_ball_contact_point_magnitude < 1e-16) {
             deltaP_1 = 0;
             deltaP_2 = 0;
             deltaP_x_1 = 0;
@@ -138,38 +139,37 @@ DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, floa
             deltaP_x_2 = 0;
             deltaP_y_2 = 0;
         } else {
-            deltaP_1 = -u_b * deltaP * contact_point_sliding_velocity_x / contact_point_sliding_spin_magnitude;
-            if(fabs(contact_point_spin_velocity_z) < 1e-16) {
+            deltaP_1 = -u_b * deltaP * contact_point_velocity_x / ball_ball_contact_point_magnitude;
+            if(fabs(contact_point_velocity_z) < 1e-16) {
                 deltaP_2 = 0;
                 deltaP_x_1 = 0;
                 deltaP_y_1 = 0;
                 deltaP_x_2 = 0;
                 deltaP_y_2 = 0;
             } else {
-                deltaP_2 = -u_b * deltaP * contact_point_spin_velocity_z / contact_point_sliding_spin_magnitude;
+                deltaP_2 = -u_b * deltaP * contact_point_velocity_z / ball_ball_contact_point_magnitude;
 
                 if(deltaP_2 > 0) {
                     deltaP_x_1 = 0;
                     deltaP_y_1 = 0;
 
                     // TODO: probably best to check for some tolerance
-                    if(contact_point_velocity_magnitude_2 == 0.0) {
+                    if(surface_velocity_magnitude_2 == 0.0) {
                         deltaP_x_2 = 0;
                         deltaP_y_2 = 0;
                     } else {
-                        deltaP_x_2 = -u_s2 * (velocity_at_contact_point_x_2 / contact_point_velocity_magnitude_2) * deltaP_2;
-                        deltaP_y_2 = -u_s2 * (velocity_at_contact_point_y_2 / contact_point_velocity_magnitude_2) * deltaP_2;
+                        deltaP_x_2 = -u_s2 * (surface_velocity_x_2 / surface_velocity_magnitude_2) * deltaP_2;
+                        deltaP_y_2 = -u_s2 * (surface_velocity_y_2 / surface_velocity_magnitude_2) * deltaP_2;
                     }
                 } else {
                     deltaP_x_2 = 0;
                     deltaP_y_2 = 0;
-                    if(contact_point_velocity_magnitude_1 == 0.0) {
+                    if(surface_velocity_magnitude_1 == 0.0) {
                         deltaP_x_1 = 0;
                         deltaP_y_1 = 0;
                     } else {
-                        // Why is it also deltaP_2 here? (Same in python)
-                        deltaP_x_1 = u_s1 * (velocity_at_contact_point_x_1 / contact_point_velocity_magnitude_1) * deltaP_2;
-                        deltaP_y_1 = u_s1 * (velocity_at_contact_point_y_1 / contact_point_velocity_magnitude_1) * deltaP_2;
+                        deltaP_x_1 = u_s1 * (surface_velocity_x_1 / surface_velocity_magnitude_1) * deltaP_2;
+                        deltaP_y_1 = u_s1 * (surface_velocity_y_1 / surface_velocity_magnitude_1) * deltaP_2;
                     }
                 }
 
@@ -206,18 +206,18 @@ DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, floa
         local_angular_velocity_z_2 += delta_angular_velocity_z_2;
 
         // update ball-table slips
-        velocity_at_contact_point_x_1 = local_velocity_x_1 + R * local_angular_velocity_y_1;
-        velocity_at_contact_point_y_1 = local_velocity_y_1 - R * local_angular_velocity_x_1;
-        velocity_at_contact_point_x_2 = local_velocity_x_2 + R * local_angular_velocity_y_2;
-        velocity_at_contact_point_y_2 = local_velocity_y_2 - R * local_angular_velocity_x_2;
+        surface_velocity_x_1 = local_velocity_x_1 + R * local_angular_velocity_y_1;
+        surface_velocity_y_1 = local_velocity_y_1 - R * local_angular_velocity_x_1;
+        surface_velocity_x_2 = local_velocity_x_2 + R * local_angular_velocity_y_2;
+        surface_velocity_y_2 = local_velocity_y_2 - R * local_angular_velocity_x_2;
 
-        contact_point_velocity_magnitude_1 = sqrt(velocity_at_contact_point_x_1 * velocity_at_contact_point_x_1 + velocity_at_contact_point_y_1 * velocity_at_contact_point_y_1);
-        contact_point_velocity_magnitude_2 = sqrt(velocity_at_contact_point_x_2 * velocity_at_contact_point_x_2 + velocity_at_contact_point_y_2 * velocity_at_contact_point_y_2);
+        surface_velocity_magnitude_1 = sqrt(surface_velocity_x_1 * surface_velocity_x_1 + surface_velocity_y_1 * surface_velocity_y_1);
+        surface_velocity_magnitude_2 = sqrt(surface_velocity_x_2 * surface_velocity_x_2 + surface_velocity_y_2 * surface_velocity_y_2);
 
         // update ball-ball slip:
-        contact_point_sliding_velocity_x = local_velocity_x_1 - local_velocity_x_2 - R * (local_angular_velocity_z_1 + local_angular_velocity_z_2);
-        contact_point_spin_velocity_z = R * (local_angular_velocity_x_1 + local_angular_velocity_x_2);
-        contact_point_sliding_spin_magnitude = sqrt(contact_point_sliding_velocity_x * contact_point_sliding_velocity_x + contact_point_spin_velocity_z * contact_point_spin_velocity_z);
+        contact_point_velocity_x = local_velocity_x_1 - local_velocity_x_2 - R * (local_angular_velocity_z_1 + local_angular_velocity_z_2);
+        contact_point_velocity_z = R * (local_angular_velocity_x_1 + local_angular_velocity_x_2);
+        ball_ball_contact_point_magnitude = sqrt(contact_point_velocity_x * contact_point_velocity_x + contact_point_velocity_z * contact_point_velocity_z);
 
         // Update work and check compression phase
         double velocity_diff_y_temp = velocity_diff_y;
