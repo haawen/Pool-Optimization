@@ -21,7 +21,7 @@ from ctypes import c_size_t, c_double, c_char_p, c_float, c_int
 import platform
 
 if platform.system() == "Windows":
-    LIBRARY_PATH = r"C:\Users\karto\team52\build\Debug\pool_shared.dll"
+    LIBRARY_PATH = r"..\build\libpool_shared.dll"
 elif platform.system() == "Linux":
     LIBRARY_PATH = "../build/libpool_shared.so"
 else:
