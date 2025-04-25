@@ -2,7 +2,7 @@
 
 ## Initialize the Submodule
 
-Run `git submodule update --init --recursive` in the parent directory
+Run `git submodule update --init --recursive` in the main directory
 
 ## Compile the C shared library
 
