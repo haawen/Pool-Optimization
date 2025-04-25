@@ -4,7 +4,7 @@ build-backend = "poetry_dynamic_versioning.backend"
 
 [tool.poetry-dynamic-versioning]
 enable = true
-strict = true
+strict = false
 bump = true
 vcs = "git"
 # The 'pep440' style appends the git commit hash to the version number when
