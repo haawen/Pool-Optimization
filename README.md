@@ -1,6 +1,10 @@
 # Getting Things To Run
 
-## Compiling the C shared library
+## Initialize the Submodule
+
+Run `git submodule update --init --recursive` in the parent directory
+
+## Compile the C shared library
 
 Inside of `build`, run `cmake ..` and `cmake --build .`
 This builds us 3 executables
@@ -8,7 +12,7 @@ This builds us 3 executables
   - `pool_tests` unit testing
   - `libpool_shared` (different name on windows) the shared library which will be called by pooltool python library.
 
-## Setting up Pooltools
+## Set up Pooltool
 
 In the `pooltool` folder, follow the installation guide from [pooltool](https://pooltool.readthedocs.io/en/latest/getting_started/install.html).
 I read the from source section, dont know if pip is enough.
