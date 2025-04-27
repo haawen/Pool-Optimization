@@ -276,7 +276,7 @@ int main(int argc, char* argv[]) {
            get_scenario_name(run_scenario >= 0 ? scenarios[run_scenario] : SCENARIO_RANDOM), test_deltaP);
     printf("CollisionIterations,AverageTime(s)\n");
     
-    int collision_iter_values[] = {5, 10, 20, 50, 100};
+    int collision_iter_values[] = {5, 10, 20, 50, 100, 500, 1000};
     for (int i = 0; i < sizeof(collision_iter_values)/sizeof(int); i++) {
         int n = collision_iter_values[i];
         double avg_time = run_benchmark(iterations, n, test_deltaP, 
@@ -290,7 +290,7 @@ int main(int argc, char* argv[]) {
            collision_iterations);
     printf("deltaP,AverageTime(s)\n");
     
-    float deltaP_values[] = {0.0, 0.001, 0.005, 0.01, 0.05};
+    float deltaP_values[] = {0.0f, 0.0003315f, 0.001f, 0.005f, 0.01f, 0.05f};
     for (int i = 0; i < sizeof(deltaP_values)/sizeof(float); i++) {
         float dp = deltaP_values[i];
         double avg_time = run_benchmark(iterations, collision_iterations, dp, 
