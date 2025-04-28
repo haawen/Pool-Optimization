@@ -2,7 +2,22 @@
 
 ## Potential Optimizations
 
+Code should be within 10^-4, 10^-6 (reasonable epsilon)
+
 ### Code Optimizations
+- Code Motion
+  - Minimize opertions
+  - Standard C optimizations
+  - Investigat Sqrt's
+
+- Profiling
+  - Get Scalar results before intrinsics
+
+- Compilers
+  - Compiler options / multiple compilers
+  - Godbolt checking
+  - Vectorization through compiler
+
 - Inline Functions
   - Reduce function call overhead for frequently used operations
   - Add static inline helpers for vector operations
