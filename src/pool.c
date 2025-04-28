@@ -3,6 +3,14 @@
 
 #include <stdio.h>
 #include <math.h>
+#include <time.h>
+#ifdef _MSC_VER
+    #include <intrin.h>
+    #include <windows.h>
+#else
+    #include <x86intrin.h>
+#endif
+
 
 DLL_EXPORT void hello_world(const char* matrix_name, double* rvw) {
 
@@ -35,6 +43,17 @@ DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, floa
     printf("  Velocity: %.6f %.6f %.6f\n", velocity_2[0], velocity_2[1], velocity_2[2]);
     printf("  Angular:  %.6f %.6f %.6f\n", angular_velocity_2[0], angular_velocity_2[1], angular_velocity_2[2]);
     */
+   #ifdef PROFILE
+        #ifdef _MSC_VER
+            LARGE_INTEGER freq_init, start_counter_init, end_counter_init;
+            QueryPerformanceFrequency(&freq_init);
+            QueryPerformanceCounter(&start_counter_init);
+        #else
+            struct timespec start_ts_init, end_ts_init;
+            clock_gettime(CLOCK_MONOTONIC, &start_ts_init);
+        #endif
+        unsigned long long cycle_start_init = __rdtsc();
+    #endif
 
     double offset[3];
     subV3(translation_2, translation_1, offset);
@@ -50,9 +69,9 @@ DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, floa
     double right[3]; // Axis orthogonal to Z and forward
     crossV3(forward, up, right);
 
-    printf("\nC Local Coordinate System:\n");
-    printf("  x_loc (right): %.6f %.6f %.6f\n", right[0], right[1], right[2]);
-    printf("  y_loc (forward): %.6f %.6f %.6f\n", forward[0], forward[1], forward[2]);
+    //printf("\nC Local Coordinate System:\n");
+    //printf("  x_loc (right): %.6f %.6f %.6f\n", right[0], right[1], right[2]);
+    //printf("  y_loc (forward): %.6f %.6f %.6f\n", forward[0], forward[1], forward[2]);
 
     // From here on, it is assumed that the x axis is the right axis and y axis is the forward axis
     // Transform velocities to local frame
@@ -61,9 +80,9 @@ DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, floa
     double local_velocity_x_2 = dotV3(velocity_2, right);
     double local_velocity_y_2 = dotV3(velocity_2, forward);
 
-    printf("\nC Initial Local Velocities:\n");
-    printf("  Ball 1: v_ix = %.6f, v_iy = %.6f\n", local_velocity_x_1, local_velocity_y_1);
-    printf("  Ball 2: v_jx = %.6f, v_jy = %.6f\n", local_velocity_x_2, local_velocity_y_2);
+    //printf("\nC Initial Local Velocities:\n");
+    //printf("  Ball 1: v_ix = %.6f, v_iy = %.6f\n", local_velocity_x_1, local_velocity_y_1);
+    //printf("  Ball 2: v_jx = %.6f, v_jy = %.6f\n", local_velocity_x_2, local_velocity_y_2);
 
     // Transform angular velocities into local frame
     double local_angular_velocity_x_1 = dotV3(angular_velocity_1, right);
@@ -73,9 +92,9 @@ DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, floa
     double local_angular_velocity_y_2 = dotV3(angular_velocity_2, forward);
     double local_angular_velocity_z_2 = dotV3(angular_velocity_2, up);
 
-    printf("\nC Initial Angular Local Velocities:\n");
-    printf("  Ball 1: v_ix = %.6f, v_iy = %.6f, v_iy = %.6f\n", local_angular_velocity_x_1, local_angular_velocity_y_1, local_angular_velocity_z_1);
-    printf("  Ball 2: v_jx = %.6f, v_jy = %.6f, v_jy = %.6f\n", local_angular_velocity_x_2, local_angular_velocity_y_2, local_angular_velocity_z_2);
+    //printf("\nC Initial Angular Local Velocities:\n");
+    //printf("  Ball 1: v_ix = %.6f, v_iy = %.6f, v_iy = %.6f\n", local_angular_velocity_x_1, local_angular_velocity_y_1, local_angular_velocity_z_1);
+   // printf("  Ball 2: v_jx = %.6f, v_jy = %.6f, v_jy = %.6f\n", local_angular_velocity_x_2, local_angular_velocity_y_2, local_angular_velocity_z_2);
 
     // Calculate velocity at contact point
     // = Calculate ball-table slips?
@@ -89,18 +108,42 @@ DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, floa
     double surface_velocity_magnitude_1 = sqrt(surface_velocity_x_1 * surface_velocity_x_1 + surface_velocity_y_1 * surface_velocity_y_1);
     double surface_velocity_magnitude_2 = sqrt(surface_velocity_x_2 * surface_velocity_x_2 + surface_velocity_y_2 * surface_velocity_y_2);
 
-    printf("\nC Table Contact Point Velocity Magnitude:\n");
-    printf("  Ball 1: u_iR_xy_mag= %.6f\n", surface_velocity_magnitude_1);
-    printf("  Ball 2: u_jR_xy_mag= %.6f\n", surface_velocity_magnitude_2);
+   // printf("\nC Table Contact Point Velocity Magnitude:\n");
+    //printf("  Ball 1: u_iR_xy_mag= %.6f\n", surface_velocity_magnitude_1);
+    //printf("  Ball 2: u_jR_xy_mag= %.6f\n", surface_velocity_magnitude_2);
 
     // Relative surface velocity in the x-direction at the point where the two balls are in contact.
     // ball-ball slip
     double contact_point_velocity_x = local_velocity_x_1 - local_velocity_x_2 - R * (local_angular_velocity_z_1 + local_angular_velocity_z_2);
     double contact_point_velocity_z = R * (local_angular_velocity_x_1 + local_angular_velocity_x_2);
     double ball_ball_contact_point_magnitude = sqrt(contact_point_velocity_x * contact_point_velocity_x + contact_point_velocity_z * contact_point_velocity_z);
-    printf("\nC Contact Point Slide, Spin:\n");
-    printf("  Contact Point: u_ijC_xz_mag= %.6f\n", ball_ball_contact_point_magnitude);
+    //printf("\nC Contact Point Slide, Spin:\n");
+    //printf("  Contact Point: u_ijC_xz_mag= %.6f\n", ball_ball_contact_point_magnitude);
 
+    #ifdef PROFILE
+        #ifdef _MSC_VER
+            QueryPerformanceCounter(&end_counter_init);
+            unsigned long long ns_init = (unsigned long long)(((end_counter_init.QuadPart - start_counter_init.QuadPart) * 1e9) / freq_init.QuadPart);
+        #else
+            clock_gettime(CLOCK_MONOTONIC, &end_ts_init);
+            unsigned long long ns_init = (end_ts_init.tv_sec - start_ts_init.tv_sec) * 1000000000ULL 
+                                        + (end_ts_init.tv_nsec - start_ts_init.tv_nsec);
+        #endif
+        unsigned long long cycles_init = __rdtsc() - cycle_start_init; // assuming cycle_start_init was recorded with __rdtsc()
+        printf("\n== Profiling: Initial calculations took %llu ns (%llu cycles) ==\n", ns_init, cycles_init);
+    #endif
+
+    #ifdef PROFILE
+        #ifdef _MSC_VER
+            LARGE_INTEGER freq_loop, start_counter_loop, end_counter_loop;
+            QueryPerformanceFrequency(&freq_loop);
+            QueryPerformanceCounter(&start_counter_loop);
+        #else
+            struct timespec start_ts_loop, end_ts_loop;
+            clock_gettime(CLOCK_MONOTONIC, &start_ts_loop);
+        #endif
+        unsigned long long cycle_start_loop = __rdtsc();
+    #endif
     // Main collision loop
     double velocity_diff_y = local_velocity_y_2 - local_velocity_y_1;
 
@@ -244,6 +287,19 @@ DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, floa
         */
 
     }
+
+    #ifdef PROFILE
+        #ifdef _MSC_VER
+            QueryPerformanceCounter(&end_counter_loop);
+            unsigned long long ns_loop = (unsigned long long)(((end_counter_loop.QuadPart - start_counter_loop.QuadPart) * 1e9) / freq_loop.QuadPart);
+        #else
+            clock_gettime(CLOCK_MONOTONIC, &end_ts_loop);
+            unsigned long long ns_loop = (end_ts_loop.tv_sec - start_ts_loop.tv_sec) * 1000000000ULL 
+                                        + (end_ts_loop.tv_nsec - start_ts_loop.tv_nsec);
+        #endif
+        unsigned long long cycles_loop = __rdtsc() - cycle_start_loop;  // assuming cycle_start_loop was recorded with __rdtsc()
+        printf("\n== Profiling: Collision loop executed in %llu ns (%llu cycles) over %d iterations ==\n", ns_loop, cycles_loop, niter);
+    #endif
 
     printf("\nC Final Local Velocities:\n");
     printf("  Ball 1: v_ix = %.6f, v_iy = %.6f\n", local_velocity_x_1, local_velocity_y_1);

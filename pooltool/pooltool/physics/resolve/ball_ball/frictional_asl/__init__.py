@@ -21,7 +21,7 @@ from ctypes import c_size_t, c_double, c_char_p, c_float, c_int
 import platform
 
 if platform.system() == "Windows":
-    LIBRARY_PATH = r"..\build\libpool_shared.dll"
+    LIBRARY_PATH = r"C:\Users\karto\team52\build\Debug\pool_shared.dll"
 elif platform.system() == "Linux":
     LIBRARY_PATH = "../build/libpool_shared.so"
 else:
@@ -112,6 +112,7 @@ def collide_balls(
     sys.stdout.flush()
 
     asl_lib.collide_balls(
+        
         rvw1.copy().flatten(),
         rvw2.copy().flatten(),
         R,
@@ -125,12 +126,34 @@ def collide_balls(
         rvw_result_1,
         rvw_result_2,
     )
+    """Simulates the frictional collision between two balls."""
+    print("\n=== Collision Parameters ===")
+    print(f"R (ball radius): {R}")
+    print(f"M (ball mass): {M}")
+    print(f"u_s1 (coefficient of sliding friction ball 1): {u_s1}")
+    print(f"u_s2 (coefficient of sliding friction ball 2): {u_s2}")
+    print(f"u_b (coefficient of friction between balls): {u_b}")
+    print(f"e_b (coefficient of restitution): {e_b}")
+    print(f"deltaP (normal impulse step size): {deltaP}")
+    print(f"N (number of iterations): {N}")
+    print(f"rvw1 {rvw1.flatten()}")
+    print(f"rvw2 {rvw2.flatten()}")
+    print("=== End Parameters ===\n")
 
     v_i1_C_code = rvw_result_1[3:6]
     w_i1_C_code = rvw_result_1[6:]
 
     v_j1_C_code = rvw_result_2[3:6]
     w_j1_C_code = rvw_result_2[6:]
+
+    print("\n=== C Code Results ===")
+    print("C Code Ball 1:")
+    print("  Position:", v_i1[0], v_i1[1], v_i1[2])
+    print("  Angular: ", w_i1[0], w_i1[1], w_i1[2])
+    print("C Code Ball 2:")
+    print("  Position:", v_j1[0], v_j1[1], v_j1[2])
+    print("  Angular: ", w_j1[0], w_j1[1], w_j1[2])
+    print("=== End C Code Results ===\n")
 
     if not np.allclose(v_i1, v_i1_C_code, atol=0.001):
         print("WARNING: v_i1 and v_i1_C_code are too dissimilar!")
