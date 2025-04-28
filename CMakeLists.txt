@@ -13,7 +13,8 @@ set(SOURCES
 )
 
 add_library(pool_shared SHARED ${SOURCES})
-add_executable(pool src/main.c ${SOURCES})
+
+add_executable(profiling src/profiling.c ${SOURCES})
 
 include_directories(${UNITY_DIR})
 
@@ -26,7 +27,7 @@ add_executable(pool_tests
 target_compile_definitions(pool_tests PRIVATE UNITY_INCLUDE_DOUBLE)
 
 if(UNIX)
-    target_link_libraries(pool m)
+    target_link_libraries(profiling m)
     target_link_libraries(pool_shared m)
     target_link_libraries(pool_tests m)
 endif()
