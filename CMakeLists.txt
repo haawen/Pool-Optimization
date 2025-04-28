@@ -23,8 +23,10 @@ add_executable(pool_tests
     ${SOURCES}
 )
 
+target_compile_definitions(pool_tests PRIVATE UNITY_INCLUDE_DOUBLE)
+
 if(UNIX)
-target_link_libraries(pool m)
-target_link_libraries(pool_shared m)
-target_link_libraries(pool_tests m)
+    target_link_libraries(pool m)
+    target_link_libraries(pool_shared m)
+    target_link_libraries(pool_tests m)
 endif()
