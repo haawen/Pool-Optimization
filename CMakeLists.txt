@@ -16,6 +16,7 @@ add_library(pool_shared SHARED ${SOURCES})
 
 add_executable(profiling src/profiling.c ${SOURCES})
 target_compile_definitions(profiling PRIVATE PROFILE)
+target_compile_definitions(profiling PRIVATE FLOP_COUNT)
 
 include_directories(${UNITY_DIR})
 

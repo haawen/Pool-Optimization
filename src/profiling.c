@@ -1,4 +1,3 @@
-#define PROFILE
 #include "pool.h"
 
 int main() {
