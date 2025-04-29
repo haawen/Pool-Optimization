@@ -15,7 +15,7 @@ set(SOURCES
 add_library(pool_shared SHARED ${SOURCES})
 
 add_executable(profiling src/profiling.c ${SOURCES})
-add_compile_definitions(PROFILE)
+target_compile_definitions(profiling PRIVATE PROFILE)
 
 include_directories(${UNITY_DIR})
 

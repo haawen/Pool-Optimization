@@ -4,6 +4,9 @@
 #include <stdio.h>
 #include <math.h>
 #include <time.h>
+#include <string.h>
+
+
 #ifdef _MSC_VER
     #include <intrin.h>
     #include <windows.h>
@@ -22,7 +25,69 @@ DLL_EXPORT void hello_world(const char* matrix_name, double* rvw) {
 
 }
 
+typedef struct {
+    unsigned long long cycle_start;
+    #ifdef _MSC_VER
+        LARGE_INTEGER freq, start_counter, end_counter;
+    #else
+        struct timespec start_ts, end_ts;
+    #endif
+} Profile;
+
+
+void start_profiling_section(Profile* profile) {
+    #ifdef _MSC_VER
+        QueryPerformanceFrequency(&profile->freq);
+        QueryPerformanceCounter(&profile->start_counter);
+    #else
+        clock_gettime(CLOCK_MONOTONIC, &profile->start_ts);
+    #endif
+    profile->cycle_start = __rdtsc();
+}
+
+void end_profiling_section(Profile* profile) {
+    #ifdef _MSC_VER
+        QueryPerformanceCounter(&profile->end_counter_init);
+        // unsigned long long ns_init = (unsigned long long)(((end_counter_init.QuadPart - start_counter_init.QuadPart) * 1e9) / freq_init.QuadPart);
+    #else
+        clock_gettime(CLOCK_MONOTONIC, &profile->end_ts);
+        //unsigned long long ns_init = (end_ts_init.tv_sec - start_ts_init.tv_sec) * 1000000000ULL
+        //                            + (end_ts_init.tv_nsec - start_ts_init.tv_nsec);
+    #endif
+    // unsigned long long cycles_init = __rdtsc() - cycle_start_init; // assuming cycle_start_init was recorded with __rdtsc()
+    // printf("\n== Profiling: Initial calculations took %llu ns (%llu cycles) ==\n", ns_init, cycles_init);
+}
+
+void summarize_profile(Profile* profile, const char* name) {
+
+    unsigned long long ns = 0;
+    #ifdef _MSC_VER
+            ns = (unsigned long long)(((profile->end_counter.QuadPart - profile->start_counter.QuadPart) * 1e9) / profile->freq.QuadPart);
+        #else
+            ns = (profile->end_ts.tv_sec - profile->start_ts.tv_sec) * 1000000000ULL + (profile->end_ts.tv_nsec - profile->start_ts.tv_nsec);
+        #endif
+
+    unsigned long long cycles = __rdtsc() - profile->cycle_start;
+
+   printf("\n=== %s Profile === \n", name);
+   printf("\t%-12s %e\n", "Nanoseconds:", (double)ns);
+   printf("\t%-12s %e\n", "Cycles:", (double)cycles);
+   int total_length = 4 + strlen(name) + 13;
+   for (int i = 0; i < total_length; i++) {
+       putchar('=');
+   }
+   printf("\n");
+}
+
 DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double* rvw1_result, double* rvw2_result) {
+
+
+    #ifdef PROFILE
+        Profile init_profile;
+        Profile loop;
+    #endif
+
+
     double* translation_1 = get_displacement(rvw1);
     double* velocity_1 = get_velocity(rvw1);
     double* angular_velocity_1 = get_angular_velocity(rvw1);
@@ -31,28 +96,8 @@ DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, floa
     double* velocity_2 = get_velocity(rvw2);
     double* angular_velocity_2 = get_angular_velocity(rvw2);
 
-    // Print initial states
-    /*
-    printf("C Initial State - Ball 1:\n");
-    printf("  Position: %.6f %.6f %.6f\n", translation_1[0], translation_1[1], translation_1[2]);
-    printf("  Velocity: %.6f %.6f %.6f\n", velocity_1[0], velocity_1[1], velocity_1[2]);
-    printf("  Angular:  %.6f %.6f %.6f\n", angular_velocity_1[0], angular_velocity_1[1], angular_velocity_1[2]);
-
-    printf("C Initial State - Ball 2:\n");
-    printf("  Position: %.6f %.6f %.6f\n", translation_2[0], translation_2[1], translation_2[2]);
-    printf("  Velocity: %.6f %.6f %.6f\n", velocity_2[0], velocity_2[1], velocity_2[2]);
-    printf("  Angular:  %.6f %.6f %.6f\n", angular_velocity_2[0], angular_velocity_2[1], angular_velocity_2[2]);
-    */
    #ifdef PROFILE
-        #ifdef _MSC_VER
-            LARGE_INTEGER freq_init, start_counter_init, end_counter_init;
-            QueryPerformanceFrequency(&freq_init);
-            QueryPerformanceCounter(&start_counter_init);
-        #else
-            struct timespec start_ts_init, end_ts_init;
-            clock_gettime(CLOCK_MONOTONIC, &start_ts_init);
-        #endif
-        unsigned long long cycle_start_init = __rdtsc();
+        start_profiling_section(&init_profile);
     #endif
 
     double offset[3];
@@ -69,20 +114,12 @@ DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, floa
     double right[3]; // Axis orthogonal to Z and forward
     crossV3(forward, up, right);
 
-    //printf("\nC Local Coordinate System:\n");
-    //printf("  x_loc (right): %.6f %.6f %.6f\n", right[0], right[1], right[2]);
-    //printf("  y_loc (forward): %.6f %.6f %.6f\n", forward[0], forward[1], forward[2]);
-
     // From here on, it is assumed that the x axis is the right axis and y axis is the forward axis
     // Transform velocities to local frame
     double local_velocity_x_1 = dotV3(velocity_1, right);
     double local_velocity_y_1 = dotV3(velocity_1, forward);
     double local_velocity_x_2 = dotV3(velocity_2, right);
     double local_velocity_y_2 = dotV3(velocity_2, forward);
-
-    //printf("\nC Initial Local Velocities:\n");
-    //printf("  Ball 1: v_ix = %.6f, v_iy = %.6f\n", local_velocity_x_1, local_velocity_y_1);
-    //printf("  Ball 2: v_jx = %.6f, v_jy = %.6f\n", local_velocity_x_2, local_velocity_y_2);
 
     // Transform angular velocities into local frame
     double local_angular_velocity_x_1 = dotV3(angular_velocity_1, right);
@@ -91,10 +128,6 @@ DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, floa
     double local_angular_velocity_x_2 = dotV3(angular_velocity_2, right);
     double local_angular_velocity_y_2 = dotV3(angular_velocity_2, forward);
     double local_angular_velocity_z_2 = dotV3(angular_velocity_2, up);
-
-    //printf("\nC Initial Angular Local Velocities:\n");
-    //printf("  Ball 1: v_ix = %.6f, v_iy = %.6f, v_iy = %.6f\n", local_angular_velocity_x_1, local_angular_velocity_y_1, local_angular_velocity_z_1);
-   // printf("  Ball 2: v_jx = %.6f, v_jy = %.6f, v_jy = %.6f\n", local_angular_velocity_x_2, local_angular_velocity_y_2, local_angular_velocity_z_2);
 
     // Calculate velocity at contact point
     // = Calculate ball-table slips?
@@ -108,10 +141,6 @@ DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, floa
     double surface_velocity_magnitude_1 = sqrt(surface_velocity_x_1 * surface_velocity_x_1 + surface_velocity_y_1 * surface_velocity_y_1);
     double surface_velocity_magnitude_2 = sqrt(surface_velocity_x_2 * surface_velocity_x_2 + surface_velocity_y_2 * surface_velocity_y_2);
 
-   // printf("\nC Table Contact Point Velocity Magnitude:\n");
-    //printf("  Ball 1: u_iR_xy_mag= %.6f\n", surface_velocity_magnitude_1);
-    //printf("  Ball 2: u_jR_xy_mag= %.6f\n", surface_velocity_magnitude_2);
-
     // Relative surface velocity in the x-direction at the point where the two balls are in contact.
     // ball-ball slip
     double contact_point_velocity_x = local_velocity_x_1 - local_velocity_x_2 - R * (local_angular_velocity_z_1 + local_angular_velocity_z_2);
@@ -121,29 +150,11 @@ DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, floa
     //printf("  Contact Point: u_ijC_xz_mag= %.6f\n", ball_ball_contact_point_magnitude);
 
     #ifdef PROFILE
-        #ifdef _MSC_VER
-            QueryPerformanceCounter(&end_counter_init);
-            unsigned long long ns_init = (unsigned long long)(((end_counter_init.QuadPart - start_counter_init.QuadPart) * 1e9) / freq_init.QuadPart);
-        #else
-            clock_gettime(CLOCK_MONOTONIC, &end_ts_init);
-            unsigned long long ns_init = (end_ts_init.tv_sec - start_ts_init.tv_sec) * 1000000000ULL 
-                                        + (end_ts_init.tv_nsec - start_ts_init.tv_nsec);
-        #endif
-        unsigned long long cycles_init = __rdtsc() - cycle_start_init; // assuming cycle_start_init was recorded with __rdtsc()
-        printf("\n== Profiling: Initial calculations took %llu ns (%llu cycles) ==\n", ns_init, cycles_init);
+        end_profiling_section(&init_profile);
     #endif
 
-    #ifdef PROFILE
-        #ifdef _MSC_VER
-            LARGE_INTEGER freq_loop, start_counter_loop, end_counter_loop;
-            QueryPerformanceFrequency(&freq_loop);
-            QueryPerformanceCounter(&start_counter_loop);
-        #else
-            struct timespec start_ts_loop, end_ts_loop;
-            clock_gettime(CLOCK_MONOTONIC, &start_ts_loop);
-        #endif
-        unsigned long long cycle_start_loop = __rdtsc();
-    #endif
+
+
     // Main collision loop
     double velocity_diff_y = local_velocity_y_2 - local_velocity_y_1;
 
@@ -158,8 +169,6 @@ DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, floa
     double work_required = INFINITY; // Total amount of work required before collision handling is complete
     double work_compression = 0;
 
-    int niter = 0;
-
     // TODO: better naming for deltas
     // Delta impulse overall per ball?
     double deltaP_1 = deltaP;
@@ -171,6 +180,9 @@ DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, floa
     double deltaP_x_2 = 0;
     double deltaP_y_2 = 0;
 
+    #ifdef PROFILE
+         start_profiling_section(&loop);
+     #endif
     while (velocity_diff_y < 0 || total_work < work_required) {
 
         // Impulse Calculation
@@ -271,45 +283,11 @@ DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, floa
             work_compression = total_work;
             work_required = (1.0 + e_b * e_b) * work_compression;
         }
-
-        niter++;
-
-        /*
-        printf("\nC DELTA P:\n");
-        printf("  deltaP_1= %.16f, deltaP_2=%.16f\n", deltaP_1, deltaP_2);
-        printf("  deltaP_x_1= %.16f, deltaP_y_1=%.16f\n", deltaP_x_1, deltaP_y_1);
-        printf("  deltaP_x_2= %.16f, deltaP_y_2=%.16f\n", deltaP_x_2, deltaP_y_2);
-
-
-        if(niter > 10) {
-            break;
-        }
-        */
-
     }
 
     #ifdef PROFILE
-        #ifdef _MSC_VER
-            QueryPerformanceCounter(&end_counter_loop);
-            unsigned long long ns_loop = (unsigned long long)(((end_counter_loop.QuadPart - start_counter_loop.QuadPart) * 1e9) / freq_loop.QuadPart);
-        #else
-            clock_gettime(CLOCK_MONOTONIC, &end_ts_loop);
-            unsigned long long ns_loop = (end_ts_loop.tv_sec - start_ts_loop.tv_sec) * 1000000000ULL 
-                                        + (end_ts_loop.tv_nsec - start_ts_loop.tv_nsec);
-        #endif
-        unsigned long long cycles_loop = __rdtsc() - cycle_start_loop;  // assuming cycle_start_loop was recorded with __rdtsc()
-        printf("\n== Profiling: Collision loop executed in %llu ns (%llu cycles) over %d iterations ==\n", ns_loop, cycles_loop, niter);
+        end_profiling_section(&loop);
     #endif
-
-    printf("\nC Final Local Velocities:\n");
-    printf("  Ball 1: v_ix = %.6f, v_iy = %.6f\n", local_velocity_x_1, local_velocity_y_1);
-    printf("  Ball 2: v_jx = %.6f, v_jy = %.6f\n", local_velocity_x_2, local_velocity_y_2);
-
-
-    printf("\nC Final local Angular Velocities:\n");
-    printf("  Ball 1: %.6f %.6f %.6f\n", local_angular_velocity_x_1, local_angular_velocity_y_1, local_angular_velocity_z_1);
-    printf("  Ball 2: %.6f %.6f %.6f\n", local_angular_velocity_x_2, local_angular_velocity_y_2, local_angular_velocity_z_2);
-
 
     // Transform back to global coordinates
     for (int i = 0; i < 3; i++) {
@@ -326,17 +304,10 @@ DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, floa
         }
     }
 
-    printf("\nC Final Global Velocities:\n");
-    printf("  Ball 1: %.6f %.6f %.6f\n", rvw1_result[3], rvw1_result[4], rvw1_result[5]);
-    printf("  Ball 2: %.6f %.6f %.6f\n", rvw2_result[3], rvw2_result[4], rvw2_result[5]);
-
-    printf("\nC Final Global Angular Velocities:\n");
-    printf("  Ball 1: %.6f %.6f %.6f\n", rvw1_result[6], rvw1_result[7], rvw1_result[8]);
-    printf("  Ball 2: %.6f %.6f %.6f\n", rvw2_result[6], rvw2_result[7], rvw2_result[8]);
-
-    printf("\n=== End C Implementation ===\n");
-
-    fflush(stdout);
+    #ifdef PROFILE
+        summarize_profile(&init_profile, "Initialization");
+        summarize_profile(&loop, "Loop");
+    #endif
 }
 
 /* Assuming rvw is row-major (passed from pooltool) */
