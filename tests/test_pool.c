@@ -174,7 +174,7 @@ void test_accuracy(void) {
     for(int i = 0; i < test_cases; i++) {
         double rvw1_result[9];
         double rvw2_result[9];
-        collide_balls(
+        code_motion_collide_balls(
             reference[i].rvw1,
             reference[i].rvw2,
             reference[i].R,
