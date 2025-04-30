@@ -3,11 +3,7 @@
 
 #include <stdio.h>
 #include <math.h>
-#include <time.h>
-#include <string.h>
 #include <stdbool.h>
-
-#define PROFILE
 
 #ifdef _MSC_VER
     #include <intrin.h>
@@ -26,17 +22,6 @@ DLL_EXPORT void hello_world(const char* matrix_name, double* rvw) {
    }
 
 }
-
-typedef struct {
-    unsigned long long cycle_start;
-    unsigned long long cycle_end;
-    #ifdef _MSC_VER
-        LARGE_INTEGER freq, start_counter, end_counter;
-    #else
-        struct timespec start_ts, end_ts;
-    #endif
-} Profile;
-
 
 static inline void start_profiling_section(Profile* profile) {
     #ifdef _MSC_VER
@@ -61,36 +46,15 @@ static inline void end_profiling_section(Profile* profile) {
     profile->cycle_end = __rdtsc();
 }
 
-void summarize_profile(Profile* profile, const char* name) {
-
-    unsigned long long ns = 0;
-    #ifdef _MSC_VER
-            ns = (unsigned long long)(((profile->end_counter.QuadPart - profile->start_counter.QuadPart) * 1e9) / profile->freq.QuadPart);
-        #else
-            ns = (profile->end_ts.tv_sec - profile->start_ts.tv_sec) * 1000000000ULL + (profile->end_ts.tv_nsec - profile->start_ts.tv_nsec);
-        #endif
-
-    unsigned long long cycles = profile->cycle_end - profile->cycle_start;
-
-   printf("\n=== %s Profile === \n", name);
-   printf("\t%-12s %llu\n", "Nanoseconds:", ns);
-   printf("\t%-12s %llu\n", "Cycles:", cycles);
-   int total_length = 4 + strlen(name) + 13;
-   for (int i = 0; i < total_length; i++) {
-       putchar('=');
-   }
-   printf("\n");
-}
-
-DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double* rvw1_result, double* rvw2_result) {
+DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double* rvw1_result, double* rvw2_result, Profile* profiles) {
 
 
     #ifdef PROFILE
-        Profile complete_function;
-        Profile before_loop;
-        Profile loop;
-        Profile single_loop_iteration;
-        Profile after_loop;
+        Profile* complete_function = &profiles[0];
+        Profile* before_loop = &profiles[1];
+        Profile* loop = &profiles[2];
+        Profile* single_loop_iteration = &profiles[3];
+        Profile* after_loop = &profiles[4];
     #endif
 
 
@@ -99,8 +63,8 @@ DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, floa
     #endif
 
     #ifdef PROFILE
-        start_profiling_section(&complete_function);
-        start_profiling_section(&before_loop);
+        start_profiling_section(complete_function);
+        start_profiling_section(before_loop);
      #endif
 
      double* translation_1 = get_displacement(rvw1);
@@ -233,15 +197,15 @@ DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, floa
     double deltaP_y_2 = 0;
 
     #ifdef PROFILE
-        end_profiling_section(&before_loop);
-         start_profiling_section(&loop);
+        end_profiling_section(before_loop);
+         start_profiling_section(loop);
          bool first_iter = true;
      #endif
     while (velocity_diff_y < 0 || total_work < work_required) {
 
         #ifdef PROFILE
             if(first_iter) {
-                start_profiling_section(&single_loop_iteration);
+                start_profiling_section(single_loop_iteration);
             }
         #endif
 
@@ -386,14 +350,14 @@ DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, floa
         #ifdef PROFILE
             if(first_iter) {
                 first_iter = false;
-                end_profiling_section(&single_loop_iteration);
+                end_profiling_section(single_loop_iteration);
             }
         #endif
     }
 
     #ifdef PROFILE
-        end_profiling_section(&loop);
-        start_profiling_section(&after_loop);
+        end_profiling_section(loop);
+        start_profiling_section(after_loop);
     #endif
 
     // Transform back to global coordinates
@@ -419,13 +383,8 @@ DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, floa
     }
 
     #ifdef PROFILE
-        end_profiling_section(&after_loop);
-        end_profiling_section(&complete_function);
-        summarize_profile(&complete_function, "collide_balls");
-        summarize_profile(&before_loop, "Initialization");
-        summarize_profile(&loop, "Loop");
-        summarize_profile(&single_loop_iteration, "Single Loop Iteration");
-        summarize_profile(&after_loop, "Transform to World Frame");
+        end_profiling_section(after_loop);
+        end_profiling_section(complete_function);
     #endif
 
     #ifdef FLOP_COUNT
@@ -434,13 +393,14 @@ DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, floa
 }
 
 
-DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double* rvw1_result, double* rvw2_result) {
+DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double* rvw1_result, double* rvw2_result, Profile* profiles) {
+
     #ifdef PROFILE
-        Profile complete_function;
-        Profile before_loop;
-        Profile loop;
-        Profile single_loop_iteration;
-        Profile after_loop;
+        Profile* complete_function = &profiles[0];
+        Profile* before_loop = &profiles[1];
+        Profile* loop = &profiles[2];
+        Profile* single_loop_iteration = &profiles[3];
+        Profile* after_loop = &profiles[4];
     #endif
 
     #ifdef FLOP_COUNT
@@ -448,8 +408,8 @@ DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, f
     #endif
 
     #ifdef PROFILE
-        start_profiling_section(&complete_function);
-        start_profiling_section(&before_loop);
+        start_profiling_section(complete_function);
+        start_profiling_section(before_loop);
      #endif
 
      // Get pointers into the state arrays
@@ -576,15 +536,15 @@ DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, f
     double deltaP_axis_2[2] = { 0, 0 };
 
     #ifdef PROFILE
-        end_profiling_section(&before_loop);
-         start_profiling_section(&loop);
+        end_profiling_section(before_loop);
+         start_profiling_section(loop);
          bool first_iter = true;
      #endif
     while (velocity_diff_y < 0 || total_work < work_required) {
 
         #ifdef PROFILE
             if(first_iter) {
-                start_profiling_section(&single_loop_iteration);
+                start_profiling_section(single_loop_iteration);
             }
         #endif
 
@@ -717,14 +677,14 @@ DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, f
         #ifdef PROFILE
             if(first_iter) {
                 first_iter = false;
-                end_profiling_section(&single_loop_iteration);
+                end_profiling_section(single_loop_iteration);
             }
         #endif
     }
 
     #ifdef PROFILE
-        end_profiling_section(&loop);
-        start_profiling_section(&after_loop);
+        end_profiling_section(loop);
+        start_profiling_section(after_loop);
     #endif
 
     // Transform back to global coordinates
@@ -749,13 +709,8 @@ DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, f
     }
 
     #ifdef PROFILE
-        end_profiling_section(&after_loop);
-        end_profiling_section(&complete_function);
-        summarize_profile(&complete_function, "collide_balls");
-        summarize_profile(&before_loop, "Initialization");
-        summarize_profile(&loop, "Loop");
-        summarize_profile(&single_loop_iteration, "Single Loop Iteration");
-        summarize_profile(&after_loop, "Transform to World Frame");
+        end_profiling_section(after_loop);
+        end_profiling_section(complete_function);
     #endif
 
     #ifdef FLOP_COUNT

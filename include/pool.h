@@ -8,6 +8,7 @@
 #endif
 
 
+#include <time.h>
     #include <stdint.h>
 
 // Class Ball defined
@@ -55,9 +56,20 @@ def collide_balls(
         is not None, this does nothing.
  */
 
-DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double* rvw1_result, double* rvw2_result);
 
-DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double* rvw1_result, double* rvw2_result);
+ typedef struct {
+     unsigned long long cycle_start;
+     unsigned long long cycle_end;
+     #ifdef _MSC_VER
+         LARGE_INTEGER freq, start_counter, end_counter;
+     #else
+         struct timespec start_ts, end_ts;
+     #endif
+ } Profile;
+
+DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double* rvw1_result, double* rvw2_result, Profile* profiles);
+
+DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double* rvw1_result, double* rvw2_result, Profile* profiles);
 
 /* Assuming rvw is row-major (passed from pooltool) */
 double* get_displacement(double* rvw);
