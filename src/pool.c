@@ -5,6 +5,7 @@
 #include <math.h>
 #include <time.h>
 #include <string.h>
+#include <stdbool.h>
 
 #define PROFILE
 
@@ -88,6 +89,7 @@ DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, floa
         Profile complete_function;
         Profile before_loop;
         Profile loop;
+        Profile single_loop_iteration;
         Profile after_loop;
     #endif
 
@@ -233,8 +235,15 @@ DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, floa
     #ifdef PROFILE
         end_profiling_section(&before_loop);
          start_profiling_section(&loop);
+         bool first_iter = true;
      #endif
     while (velocity_diff_y < 0 || total_work < work_required) {
+
+        #ifdef PROFILE
+            if(first_iter) {
+                start_profiling_section(&single_loop_iteration);
+            }
+        #endif
 
         // Impulse Calculation
         if (ball_ball_contact_point_magnitude < 1e-16) {
@@ -373,6 +382,13 @@ DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, floa
             #endif
             work_required = (1.0 + e_b * e_b) * work_compression;
         }
+
+        #ifdef PROFILE
+            if(first_iter) {
+                first_iter = false;
+                end_profiling_section(&single_loop_iteration);
+            }
+        #endif
     }
 
     #ifdef PROFILE
@@ -408,6 +424,7 @@ DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, floa
         summarize_profile(&complete_function, "collide_balls");
         summarize_profile(&before_loop, "Initialization");
         summarize_profile(&loop, "Loop");
+        summarize_profile(&single_loop_iteration, "Single Loop Iteration");
         summarize_profile(&after_loop, "Transform to World Frame");
     #endif
 
