@@ -1,0 +1,7 @@
+[project]
+name = "team52"
+version = "0.1.0"
+description = "Plot Profiling"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = ["matplotlib>=3.10.1", "pandas>=2.2.3"]

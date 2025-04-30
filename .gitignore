@@ -5,3 +5,5 @@ build/*
 .zed
 pooltool-dev/
 .vscode
+
+uv.lock

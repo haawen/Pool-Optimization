@@ -46,7 +46,7 @@ static inline void end_profiling_section(Profile* profile) {
     profile->cycle_end = __rdtsc();
 }
 
-DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double* rvw1_result, double* rvw2_result, Profile* profiles) {
+DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double* rvw1_result, double* rvw2_result, Profile* profiles, long int* total_flops) {
 
 
     #ifdef PROFILE
@@ -388,12 +388,12 @@ DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, floa
     #endif
 
     #ifdef FLOP_COUNT
-        printf("\n\n\tExecuted %lu flops. \n\n", flops);
+        *total_flops = flops;
     #endif
 }
 
 
-DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double* rvw1_result, double* rvw2_result, Profile* profiles) {
+DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double* rvw1_result, double* rvw2_result, Profile* profiles, long int* total_flops) {
 
     #ifdef PROFILE
         Profile* complete_function = &profiles[0];
@@ -714,7 +714,7 @@ DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, f
     #endif
 
     #ifdef FLOP_COUNT
-        printf("\n\n\tExecuted %lu flops. \n\n", flops);
+        *total_flops = flops;
     #endif
 }
 
