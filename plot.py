@@ -57,8 +57,6 @@ for col in ["Nanoseconds", "Cycles", "Flops"]:
 
 plt.figure(figsize=(12, 6))
 
-print(grouped)
-
 for label, group_data in grouped.groupby("Group"):
     function_name = group_data["Function"].iloc[
         0
