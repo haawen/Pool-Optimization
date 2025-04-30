@@ -6,6 +6,7 @@
 #include <time.h>
 #include <string.h>
 
+#define PROFILE
 
 #ifdef _MSC_VER
     #include <intrin.h>
@@ -27,6 +28,7 @@ DLL_EXPORT void hello_world(const char* matrix_name, double* rvw) {
 
 typedef struct {
     unsigned long long cycle_start;
+    unsigned long long cycle_end;
     #ifdef _MSC_VER
         LARGE_INTEGER freq, start_counter, end_counter;
     #else
@@ -35,7 +37,7 @@ typedef struct {
 } Profile;
 
 
-void start_profiling_section(Profile* profile) {
+static inline void start_profiling_section(Profile* profile) {
     #ifdef _MSC_VER
         QueryPerformanceFrequency(&profile->freq);
         QueryPerformanceCounter(&profile->start_counter);
@@ -45,17 +47,17 @@ void start_profiling_section(Profile* profile) {
     profile->cycle_start = __rdtsc();
 }
 
-void end_profiling_section(Profile* profile) {
+static inline void end_profiling_section(Profile* profile) {
     #ifdef _MSC_VER
-        QueryPerformanceCounter(&profile->end_counter_init);
+        QueryPerformanceCounter(&profile->end_counter);
         // unsigned long long ns_init = (unsigned long long)(((end_counter_init.QuadPart - start_counter_init.QuadPart) * 1e9) / freq_init.QuadPart);
     #else
         clock_gettime(CLOCK_MONOTONIC, &profile->end_ts);
         //unsigned long long ns_init = (end_ts_init.tv_sec - start_ts_init.tv_sec) * 1000000000ULL
         //                            + (end_ts_init.tv_nsec - start_ts_init.tv_nsec);
     #endif
-    // unsigned long long cycles_init = __rdtsc() - cycle_start_init; // assuming cycle_start_init was recorded with __rdtsc()
-    // printf("\n== Profiling: Initial calculations took %llu ns (%llu cycles) ==\n", ns_init, cycles_init);
+
+    profile->cycle_end = __rdtsc();
 }
 
 void summarize_profile(Profile* profile, const char* name) {
@@ -67,11 +69,11 @@ void summarize_profile(Profile* profile, const char* name) {
             ns = (profile->end_ts.tv_sec - profile->start_ts.tv_sec) * 1000000000ULL + (profile->end_ts.tv_nsec - profile->start_ts.tv_nsec);
         #endif
 
-    unsigned long long cycles = __rdtsc() - profile->cycle_start;
+    unsigned long long cycles = profile->cycle_end - profile->cycle_start;
 
    printf("\n=== %s Profile === \n", name);
-   printf("\t%-12s %e\n", "Nanoseconds:", (double)ns);
-   printf("\t%-12s %e\n", "Cycles:", (double)cycles);
+   printf("\t%-12s %llu\n", "Nanoseconds:", ns);
+   printf("\t%-12s %llu\n", "Cycles:", cycles);
    int total_length = 4 + strlen(name) + 13;
    for (int i = 0; i < total_length; i++) {
        putchar('=');
@@ -83,8 +85,10 @@ DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, floa
 
 
     #ifdef PROFILE
-        Profile init_profile;
+        Profile complete_function;
+        Profile before_loop;
         Profile loop;
+        Profile after_loop;
     #endif
 
 
@@ -92,6 +96,10 @@ DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, floa
     long int flops = 0;
     #endif
 
+    #ifdef PROFILE
+        start_profiling_section(&complete_function);
+        start_profiling_section(&before_loop);
+     #endif
 
     double* translation_1 = get_displacement(rvw1);
     double* velocity_1 = get_velocity(rvw1);
@@ -100,10 +108,6 @@ DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, floa
     double* translation_2 = get_displacement(rvw2);
     double* velocity_2 = get_velocity(rvw2);
     double* angular_velocity_2 = get_angular_velocity(rvw2);
-
-   #ifdef PROFILE
-        start_profiling_section(&init_profile);
-    #endif
 
     #ifdef FLOP_COUNT
         flops += 3;
@@ -189,9 +193,7 @@ DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, floa
     //printf("\nC Contact Point Slide, Spin:\n");
     //printf("  Contact Point: u_ijC_xz_mag= %.6f\n", ball_ball_contact_point_magnitude);
 
-    #ifdef PROFILE
-        end_profiling_section(&init_profile);
-    #endif
+
 
 
     #ifdef FLOP_COUNT
@@ -229,6 +231,7 @@ DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, floa
     double deltaP_y_2 = 0;
 
     #ifdef PROFILE
+        end_profiling_section(&before_loop);
          start_profiling_section(&loop);
      #endif
     while (velocity_diff_y < 0 || total_work < work_required) {
@@ -374,6 +377,7 @@ DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, floa
 
     #ifdef PROFILE
         end_profiling_section(&loop);
+        start_profiling_section(&after_loop);
     #endif
 
     // Transform back to global coordinates
@@ -399,8 +403,12 @@ DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, floa
     }
 
     #ifdef PROFILE
-        summarize_profile(&init_profile, "Initialization");
+        end_profiling_section(&after_loop);
+        end_profiling_section(&complete_function);
+        summarize_profile(&complete_function, "collide_balls");
+        summarize_profile(&before_loop, "Initialization");
         summarize_profile(&loop, "Loop");
+        summarize_profile(&after_loop, "Transform to World Frame");
     #endif
 
     #ifdef FLOP_COUNT
