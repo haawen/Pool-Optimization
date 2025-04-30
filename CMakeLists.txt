@@ -12,11 +12,13 @@ set(SOURCES
     src/math_helper.c
 )
 
+
 add_library(pool_shared SHARED ${SOURCES})
 
 add_executable(profiling src/profiling.c ${SOURCES})
 target_compile_definitions(profiling PRIVATE PROFILE)
 target_compile_definitions(profiling PRIVATE FLOP_COUNT)
+target_compile_options(profiling PRIVATE -O3 -ffast-math -march=native -Wall -Wextra -pedantic)
 
 include_directories(${UNITY_DIR})
 

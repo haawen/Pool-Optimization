@@ -548,11 +548,6 @@ DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, f
     double contact_point_velocity_x = local_velocity_x_1 - local_velocity_x_2 - R * (local_angular_velocity_z_1 + local_angular_velocity_z_2);
     double contact_point_velocity_z = R * (local_angular_velocity_x_1 + local_angular_velocity_x_2);
     double ball_ball_contact_point_magnitude = sqrt(contact_point_velocity_x * contact_point_velocity_x + contact_point_velocity_z * contact_point_velocity_z);
-    //printf("\nC Contact Point Slide, Spin:\n");
-    //printf("  Contact Point: u_ijC_xz_mag= %.6f\n", ball_ball_contact_point_magnitude);
-
-
-
 
     #ifdef FLOP_COUNT
         flops += 1;
