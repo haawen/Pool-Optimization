@@ -427,31 +427,48 @@ DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, f
     FLOPS(1, complete_function, before_loop);
     double offset_mag = sqrt(offset_mag_sqrd);
 
-    double forward[3]; // Forward from ball 1 to ball 2, normalized
-
     FLOPS(3, complete_function, before_loop);
-    divV3(offset, offset_mag, forward);
+    double forward[3]; // Forward from ball 1 to ball 2, normalized
+    forward[0] = offset[0] / offset_mag;
+    forward[1] = offset[1] / offset_mag;
+    forward[2] = offset[2] / offset_mag;
 
     double up[3] = {0, 0, 1}; // Probably up axis?
 
-    double right[3]; // Axis orthogonal to Z and forward
-
     FLOPS(9, complete_function, before_loop);
-    crossV3(forward, up, right);
+    double right[3]; // Axis orthogonal to Z and forward
+    right[0] = forward[1] * up[2] - forward[2] * up[1];
+    right[1] = forward[2] * up[0] - forward[0] * up[2];
+    right[2] = forward[0] * up[1] - forward[1] * up[0];
 
     // From here on, it is assumed that the x axis is the right axis and y axis is the forward axis
     // Transform velocities to local frame
 
     FLOPS(5*4, complete_function, before_loop);
-    double local_vel_1[2] = { dotV3(velocity_1, right), dotV3(velocity_1, forward) };
-    double local_vel_2[2] = { dotV3(velocity_2, right), dotV3(velocity_2, forward) };
+    double local_vel_1[2] = {
+        velocity_1[0] * right[0] + velocity_1[1] * right[1] + velocity_1[2] * right[2],
+        velocity_1[0] * forward[0] + velocity_1[1] * forward[1] + velocity_1[2] * forward[2]
+    };
 
+    double local_vel_2[2] = {
+        velocity_2[0] * right[0] + velocity_2[1] * right[1] + velocity_2[2] * right[2],
+        velocity_2[0] * forward[0] + velocity_2[1] * forward[1] + velocity_2[2] * forward[2]
+    };
 
     // Transform angular velocities into local frame
+    FLOPS(15, complete_function, before_loop);
+    double local_ang_1[3] = {
+        angular_1[0] * right[0] + angular_1[1] * right[1] + angular_1[2] * right[2],
+        angular_1[0] * forward[0] + angular_1[1] * forward[1] + angular_1[2] * forward[2],
+        angular_1[0] * up[0] + angular_1[1] * up[1] + angular_1[2] * up[2]
+    };
 
-    FLOPS(5*6, complete_function, before_loop);
-    double local_ang_1[3] = { dotV3(angular_1, right), dotV3(angular_1, forward), dotV3(angular_1, up) };
-    double local_ang_2[3] = { dotV3(angular_2, right), dotV3(angular_2, forward), dotV3(angular_2, up) };
+    FLOPS(15, complete_function, before_loop);
+    double local_ang_2[3] = {
+        angular_2[0] * right[0] + angular_2[1] * right[1] + angular_2[2] * right[2],
+        angular_2[0] * forward[0] + angular_2[1] * forward[1] + angular_2[2] * forward[2],
+        angular_2[0] * up[0] + angular_2[1] * up[1] + angular_2[2] * up[2]
+    };
 
 
     // Calculate velocity at contact point
