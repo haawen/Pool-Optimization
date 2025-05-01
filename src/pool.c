@@ -514,6 +514,7 @@ DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, f
     // TODO: better naming for deltas
     // Delta impulse overall per ball?
     // Impulse per axis per ball
+
     double deltaP_ball[2] = { 0, 0 };
     double deltaP_axis_1[2] = { 0, 0 };
     double deltaP_axis_2[2] = { 0, 0 };
@@ -573,44 +574,24 @@ DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, f
             }
         }
 
-        FLOPS(6, 0, 4, 0, complete_function, loop);
-        FLOPS_SINGLE_LOOP(6, 0, 4, 0);
-        // Velocity changes
-        double v_change1[2] = { (deltaP_ball[0] + deltaP_axis_1[0]) / M,
-                    (-deltaP + deltaP_axis_1[1]) / M };
-        double v_change2[2] = { (-deltaP_ball[0] + deltaP_axis_2[0]) / M,
-                    ( deltaP + deltaP_axis_2[1]) / M };
-
-
-        FLOPS(4, 0, 0, 0, complete_function, loop);
-        FLOPS_SINGLE_LOOP(4, 0, 0, 0);
+        FLOPS(10, 0, 4, 0, complete_function, loop);
+        FLOPS_SINGLE_LOOP(10, 0, 4, 0);
         // Update velocities
-        local_vel_1[0] += v_change1[0];
-        local_vel_1[1] += v_change1[1];
-        local_vel_2[0] += v_change2[0];
-        local_vel_2[1] += v_change2[1];
+        local_vel_1[0] += (deltaP_ball[0] + deltaP_axis_1[0]) / M;
+        local_vel_1[1] += (-deltaP + deltaP_axis_1[1]) / M;
+        local_vel_2[0] += (-deltaP_ball[0] + deltaP_axis_2[0]) / M;
+        local_vel_2[1] += (deltaP + deltaP_axis_2[1]) / M;
 
-        FLOPS(6, 6, 0, 0, complete_function, loop);
-        FLOPS_SINGLE_LOOP(6, 6, 0, 0);
-        // Angular velocity changes
-        double ang_change1[3] = { C * (deltaP_ball[1] + deltaP_axis_1[1]),
-                    C * (-deltaP_axis_1[0]),
-                    C * (-deltaP_ball[0]) };
-        double ang_change2[3] = { C * (deltaP_ball[1] + deltaP_axis_2[1]),
-                    C * (-deltaP_axis_2[0]),
-                    C * (-deltaP_ball[0]) };
-
-        FLOPS(6, 0, 0, 0, complete_function, loop);
-        FLOPS_SINGLE_LOOP(6, 0, 0, 0);
+        FLOPS(12, 6, 0, 0, complete_function, loop);
+        FLOPS_SINGLE_LOOP(12, 6, 0, 0);
         // Update Angular Velocities
-        local_ang_1[0] += ang_change1[0];
-        local_ang_1[1] += ang_change1[1];
-        local_ang_1[2] += ang_change1[2];
+        local_ang_1[0] += C * (deltaP_ball[1] + deltaP_axis_1[1]);
+        local_ang_1[1] += C * (-deltaP_axis_1[0]);
+        local_ang_1[2] += C * (-deltaP_ball[0]);
 
-        local_ang_2[0] += ang_change2[0];
-        local_ang_2[1] += ang_change2[1];
-        local_ang_2[2] += ang_change2[2];
-
+        local_ang_2[0] += C * (deltaP_ball[1] + deltaP_axis_2[1]);
+        local_ang_2[1] += C * (-deltaP_axis_2[0]);
+        local_ang_2[2] +=  C * (-deltaP_ball[0]);
 
         FLOPS(4, 4, 0, 0, complete_function, loop);
         FLOPS_SINGLE_LOOP(4, 4, 0, 0);
