@@ -433,13 +433,11 @@ DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, f
     forward[1] = offset[1] / offset_mag;
     forward[2] = offset[2] / offset_mag;
 
-    double up[3] = {0, 0, 1}; // Probably up axis?
-
-    FLOPS(9, complete_function, before_loop);
+    FLOPS(0, complete_function, before_loop);
     double right[3]; // Axis orthogonal to Z and forward
-    right[0] = forward[1] * up[2] - forward[2] * up[1];
-    right[1] = forward[2] * up[0] - forward[0] * up[2];
-    right[2] = forward[0] * up[1] - forward[1] * up[0];
+    right[0] = forward[1];
+    right[1] = -forward[0];
+    right[2] = 0;
 
     // From here on, it is assumed that the x axis is the right axis and y axis is the forward axis
     // Transform velocities to local frame
@@ -456,18 +454,18 @@ DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, f
     };
 
     // Transform angular velocities into local frame
-    FLOPS(15, complete_function, before_loop);
+    FLOPS(10, complete_function, before_loop);
     double local_ang_1[3] = {
         angular_1[0] * right[0] + angular_1[1] * right[1] + angular_1[2] * right[2],
         angular_1[0] * forward[0] + angular_1[1] * forward[1] + angular_1[2] * forward[2],
-        angular_1[0] * up[0] + angular_1[1] * up[1] + angular_1[2] * up[2]
+        angular_1[2]
     };
 
-    FLOPS(15, complete_function, before_loop);
+    FLOPS(10, complete_function, before_loop);
     double local_ang_2[3] = {
         angular_2[0] * right[0] + angular_2[1] * right[1] + angular_2[2] * right[2],
         angular_2[0] * forward[0] + angular_2[1] * forward[1] + angular_2[2] * forward[2],
-        angular_2[0] * up[0] + angular_2[1] * up[1] + angular_2[2] * up[2]
+        angular_2[2]
     };
 
 
