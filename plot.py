@@ -1,7 +1,17 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 
-df = pd.read_csv("build/profiling_results.csv")
+print(
+    "Make sure to have run flops and profiling before plotting. Flops needs only be run when flop count changes."
+)
+
+
+flops = pd.read_csv("build/flops.csv")
+
+df = pd.read_csv("build/profiling.csv")
+
+df = pd.merge(flops, df, on=["Function", "Section", "Test Case"])
+df["Test Case"] = "TC " + df["Test Case"].astype(str)
 
 df.columns = df.columns.str.strip()
 

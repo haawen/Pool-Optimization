@@ -1,10 +1,6 @@
-#include "pool.h"
-#include <stdbool.h>
 #include <stdio.h>
-#include "unity.h"
 
-#define WARMUP 100
-#define ITERATIONS 100
+#include "pool.h"
 
 typedef struct {
     float R;          // Ball radius
@@ -26,7 +22,6 @@ typedef struct {
 } CollisionData;
 
 #define TEST_CASES 5
-double tolerance = 1e-6;
 CollisionData reference[TEST_CASES];
 
 void setUp(void) {
@@ -172,141 +167,62 @@ void setUp(void) {
             .angular = { -20.163274160647937, 74.68250107163708, -2.0380303552667263 }
         }
     };
+}
+
+typedef void (*CollideBallsFn)(double*, double*, float, float, float, float, float, float, float, int, double*, double*, Profile*);
+
+void call_function(const char* name, CollideBallsFn collide_fn) {
+
+    FILE* csv = fopen("flops.csv", "a");
+    if (csv == NULL) {
+        perror("Failed to open CSV file");
+        return;
+    }
 
     Profile profiles[5];
-    double rvw1_result[9];
-    double rvw2_result[9];
-    for(int i = 0; i < WARMUP; i++) {
-        collide_balls(
-            reference[0].rvw1,
-            reference[0].rvw2,
-            reference[0].R,
-            reference[0].M,
-            reference[0].u_s1,
-            reference[0].u_s2,
-            reference[0].u_b,
-            reference[0].e_b,
+
+    for(int i = 0; i < TEST_CASES; i++) {
+        double rvw1_result[9];
+        double rvw2_result[9];
+        collide_fn(
+            reference[i].rvw1,
+            reference[i].rvw2,
+            reference[i].R,
+            reference[i].M,
+            reference[i].u_s1,
+            reference[i].u_s2,
+            reference[i].u_b,
+            reference[i].e_b,
             0.0f,           // deltaP
-            reference[0].N,
+            reference[i].N,
             rvw1_result,
             rvw2_result,
             profiles
         );
+
+        fprintf(csv, "%s,%s,%d,%ld\n", name, "collide_balls", i, profiles[0].flops);
+        fprintf(csv, "%s,%s,%d,%ld\n", name, "Initialization", i, profiles[1].flops);
+        fprintf(csv, "%s,%s,%d,%ld\n", name, "Loop", i, profiles[2].flops);
+        fprintf(csv, "%s,%s,%d,%ld\n", name, "Single Loop Iteration", i, profiles[3].flops);
+        fprintf(csv, "%s,%s,%d,%ld\n", name, "Transform to World Frame", i, profiles[4].flops);
     }
 
-}
-void tearDown(void) {}
-
-
-
-typedef void (*CollideBallsFn)(double*, double*, float, float, float, float, float, float, float, int, double*, double*, Profile*);
-
-void summarize_profile(Profile* profile, const char* func_name, const char* part_name, int test_case, int iteration, FILE* file) {
-
-    unsigned long long ns = 0;
-    #ifdef _MSC_VER
-            ns = (unsigned long long)(((profile->end_counter.QuadPart - profile->start_counter.QuadPart) * 1e9) / profile->freq.QuadPart);
-        #else
-            ns = (profile->end_ts.tv_sec - profile->start_ts.tv_sec) * 1000000000ULL + (profile->end_ts.tv_nsec - profile->start_ts.tv_nsec);
-        #endif
-
-    unsigned long long cycles = profile->cycle_end - profile->cycle_start;
-
-    /*
-   printf("\n=== %s Profile === \n", part_name);
-   printf("\t%-12s %llu\n", "Nanoseconds:", ns);
-   printf("\t%-12s %llu\n", "Cycles:", cycles);
-   int total_length = 4 + strlen(part_name) + 13;
-   for (int i = 0; i < total_length; i++) {
-       putchar('=');
-   }
-   printf("\n");
-   */
-
-    fprintf(file, "%s,%s,%d,%d,%llu,%llu\n", func_name, part_name, test_case, iteration, ns, cycles);
-}
-
-
-void call_function(const char* name, CollideBallsFn collide_fn) {
-
-        FILE* csv = fopen("profiling.csv", "a");
-        if (csv == NULL) {
-            perror("Failed to open CSV file");
-            return;
-        }
-
-        Profile profiles[5];
-
-        for(int j = 0; j < ITERATIONS; j++) {
-            for(int i = 0; i < TEST_CASES; i++) {
-                double rvw1_result[9];
-                double rvw2_result[9];
-                collide_fn(
-                    reference[i].rvw1,
-                    reference[i].rvw2,
-                    reference[i].R,
-                    reference[i].M,
-                    reference[i].u_s1,
-                    reference[i].u_s2,
-                    reference[i].u_b,
-                    reference[i].e_b,
-                    0.0f,           // deltaP
-                    reference[i].N,
-                    rvw1_result,
-                    rvw2_result,
-                    profiles
-                );
-
-                summarize_profile(&profiles[0], name, "collide_balls", i, j, csv);
-                summarize_profile(&profiles[1], name, "Initialization", i, j, csv);
-                summarize_profile(&profiles[2], name, "Loop", i, j, csv);
-                summarize_profile(&profiles[3], name, "Single Loop Iteration", i, j, csv);
-                summarize_profile(&profiles[4], name, "Transform to World Frame", i, j, csv);
-
-                TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(tolerance, reference[i].ball1.velocity[0], rvw1_result[3], "Ball 1 Velocity X not within tolerance!");
-                TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(tolerance, reference[i].ball1.velocity[1], rvw1_result[4], "Ball 1 Velocity Y not within tolerance!");
-                TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(tolerance, reference[i].ball1.velocity[2], rvw1_result[5], "Ball 1 Velocity Z not within tolerance!");
-
-                TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(tolerance, reference[i].ball1.angular[0], rvw1_result[6], "Ball 1 Angular Velocity X not within tolerance!");
-                TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(tolerance, reference[i].ball1.angular[1], rvw1_result[7], "Ball 1 Angular Velocity Y not within tolerance!");
-                TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(tolerance, reference[i].ball1.angular[2], rvw1_result[8], "Ball 1 Angular Velocity Z not within tolerance!");
-
-                TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(tolerance, reference[i].ball2.velocity[0], rvw2_result[3], "Ball 1 Velocity X not within tolerance!");
-                TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(tolerance, reference[i].ball2.velocity[1], rvw2_result[4], "Ball 1 Velocity Y not within tolerance!");
-                TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(tolerance, reference[i].ball2.velocity[2], rvw2_result[5], "Ball 1 Velocity Z not within tolerance!");
-
-                TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(tolerance, reference[i].ball2.angular[0], rvw2_result[6], "Ball 1 Angular Velocity X not within tolerance!");
-                TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(tolerance, reference[i].ball2.angular[1], rvw2_result[7], "Ball 1 Angular Velocity Y not within tolerance!");
-                TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(tolerance, reference[i].ball2.angular[2], rvw2_result[8], "Ball 1 Angular Velocity Z not within tolerance!");
-            }
-        }
-
-        fclose(csv);
-}
-
-void test_collide_balls_basic(void) {
-    call_function("Basic Implementation", collide_balls);
-}
-
-void test_collide_balls_code_motion(void) {
-    call_function("Code Motion", code_motion_collide_balls);
+    fclose(csv);
 }
 
 int main() {
-    FILE* csv = fopen("profiling.csv", "w");
+    FILE* csv = fopen("flops.csv", "w");
     if (csv == NULL) {
         perror("Failed to open CSV file");
         return 0;
     }
-    fprintf(csv, "Function,Section,Test Case,Iteration,Nanoseconds,Cycles\n");
+    fprintf(csv, "Function,Section,Test Case,Flops\n");
     fclose(csv);
 
-    UNITY_BEGIN();
-        RUN_TEST(test_collide_balls_basic);
-        RUN_TEST(test_collide_balls_code_motion);
-    int result = UNITY_END();
+    setUp();
 
-    printf("\n=== Now Run python plot.py to visualize profiling results. ==\n");
+    call_function("Basic Implementation", collide_balls);
+    call_function("Code Motion", code_motion_collide_balls);
 
-    return result;
+    return 0;
 }
