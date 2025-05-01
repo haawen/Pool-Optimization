@@ -67,6 +67,10 @@ def collide_balls(
      #endif
      long int flops; // W
      long int memory; // Q -> loads and stores
+     long int ADDS;
+     long int MULS;
+     long int DIVS;
+     long int SQRT;
  } Profile;
 
 DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double* rvw1_result, double* rvw2_result, Profile* profiles);
