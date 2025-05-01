@@ -191,15 +191,28 @@ for f, data in flops.groupby("Function"):
     plt.savefig(f"plots/Cost_{f}.png")
 
 
+# TODO: calcualte peak performance based on COST values and operations / ports, then plot
+# TODO: Add port info per instruction
+
 roofline = {
     "AMD Ryzen 7 7735U": {
-        "No SIMD": {"pi": 32, "beta": 28.4},
-        "SIMD": {"pi": 128, "beta": 28.4},
-    },
-    "AMD Ryzen 5 5600X": {
-        "No SIMD": {"pi": 24, "beta": 13.8},
-        "SIMD": {"pi": 192, "beta": 13.8},
-    },
+        "No SIMD": {
+            "pi": 32,
+            "beta": 28.4,
+            "ADDS": 0.5,
+            "MULS": 0.5,
+            "DIVS": 3.5,
+            "SQRT": 5.0,
+        },
+        "SIMD": {
+            "pi": 128,
+            "beta": 28.4,
+            "ADDS": 0.125,
+            "MULS": 0.125,
+            "DIVS": 0.875,
+            "SQRT": 1.25,
+        },
+    }
 }
 
 oi = np.logspace(-2, 2, 1000)
