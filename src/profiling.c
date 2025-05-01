@@ -3,8 +3,8 @@
 #include <stdio.h>
 #include "unity.h"
 
-#define WARMUP 100
-#define ITERATIONS 100
+#define WARMUP 1000
+#define ITERATIONS 1000
 
 typedef struct {
     float R;          // Ball radius

@@ -15,7 +15,7 @@
 
 #ifdef FLOP_COUNT
 
-#define FLOPS(count, ...) \
+    #define FLOPS(count, ...) \
     do { \
         void *arr[] = { __VA_ARGS__ }; \
         for (size_t i = 0; i < sizeof(arr)/sizeof(void*); i++) { \
@@ -23,14 +23,29 @@
         } \
     } while(0)
 
+    #define MEMORY(count, ...) \
+    do { \
+        void *arr[] = { __VA_ARGS__ }; \
+        for (size_t i = 0; i < sizeof(arr)/sizeof(void*); i++) { \
+            ((Profile*)arr[i])->memory += (count); \
+        } \
+    } while(0)
+
     #define FLOPS_SINGLE_LOOP(count) \
         if(first_iter) { \
         single_loop_iteration->flops += count; \
         }
+
+    #define MEMORY_SINGLE_LOOP(count) \
+        if(first_iter) { \
+        single_loop_iteration->memory += count; \
+        }
 #else
 
 #define FLOPS(count, ...)
+#define MEMORY(count, ...)
 #define FLOPS_SINGLE_LOOP(count)
+#define MEMORY_SINGLE_LOOP(count)
 
 #endif
 
@@ -56,6 +71,7 @@ static inline void start_profiling_section(Profile* profile) {
     #endif
     profile->cycle_start = __rdtsc();
     profile->flops = 0;
+    profile->memory = 0;
 }
 
 static inline void end_profiling_section(Profile* profile) {
@@ -96,13 +112,15 @@ DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, floa
     START_PROFILE(complete_function);
     START_PROFILE(before_loop);
 
-     double* translation_1 = get_displacement(rvw1);
-     double* velocity_1 = get_velocity(rvw1);
-     double* angular_velocity_1 = get_angular_velocity(rvw1);
+    // Altough the memory is not really loaded here, assuming its only compulsary misses
+    MEMORY(18, complete_function, before_loop);
+    double* translation_1 = get_displacement(rvw1);
+    double* velocity_1 = get_velocity(rvw1);
+    double* angular_velocity_1 = get_angular_velocity(rvw1);
 
-     double* translation_2 = get_displacement(rvw2);
-     double* velocity_2 = get_velocity(rvw2);
-     double* angular_velocity_2 = get_angular_velocity(rvw2);
+    double* translation_2 = get_displacement(rvw2);
+    double* velocity_2 = get_velocity(rvw2);
+    double* angular_velocity_2 = get_angular_velocity(rvw2);
 
     FLOPS(3, complete_function, before_loop);
     double offset[3];
@@ -351,6 +369,7 @@ DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, floa
     // Transform back to global coordinates
     for (int i = 0; i < 3; i++) {
 
+        MEMORY(4, complete_function, after_loop);
         FLOPS(6, complete_function, after_loop);
         rvw1_result[i + 3] = local_velocity_x_1 * right[i] + local_velocity_y_1 * forward[i];
         rvw2_result[i + 3] = local_velocity_x_2 * right[i] + local_velocity_y_2 * forward[i];
@@ -385,6 +404,7 @@ DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, f
     START_PROFILE(before_loop);
 
      // Get pointers into the state arrays
+    MEMORY(18, complete_function, before_loop);
     double* translation_1 = &rvw1[0];
     double* velocity_1    = &rvw1[3];
     double* angular_1     = &rvw1[6];
@@ -620,6 +640,7 @@ DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, f
 
     // Transform back to global coordinates
     for (int i = 0; i < 3; i++) {
+        MEMORY(4, complete_function, after_loop);
 
         FLOPS(6, complete_function, after_loop);
         rvw1_result[i+3] = local_vel_1[0] * right[i] + local_vel_1[1] * forward[i];

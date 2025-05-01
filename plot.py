@@ -17,7 +17,9 @@ df.columns = df.columns.str.strip()
 
 # Group by Function, Section, and Test Case
 grouped = (
-    df.groupby(["Function", "Section", "Test Case"])[["Nanoseconds", "Cycles", "Flops"]]
+    df.groupby(["Function", "Section", "Test Case"])[
+        ["Nanoseconds", "Cycles", "Flops", "Memory"]
+    ]
     .mean()
     .reset_index()
 )
@@ -36,7 +38,7 @@ marker_styles = {
     "Code Motion": "s",
 }
 
-for col in ["Nanoseconds", "Cycles", "Flops"]:
+for col in ["Nanoseconds", "Cycles", "Flops", "Memory"]:
     # Plotting with Y-axis in log scale and different line styles for each function
     plt.figure(figsize=(12, 6))
 
