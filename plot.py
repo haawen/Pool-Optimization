@@ -200,7 +200,7 @@ for f, data in flops.groupby("Function"):
 roofline = {
     "AMD Ryzen 7 7735U": {
         "No SIMD": {
-            "pi": 32,
+            "pi": 32,  # This is with cores included, but per core would be / 16?
             "beta": 28.4,
             "ADDS": 0.5,
             "MULS": 0.5,
