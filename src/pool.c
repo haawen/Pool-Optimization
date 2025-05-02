@@ -68,6 +68,22 @@ DLL_EXPORT void hello_world(const char* matrix_name, double* rvw) {
 
 }
 
+
+/* Assuming rvw is row-major (passed from pooltool) */
+double* get_displacement(double* rvw) {
+    return rvw;
+}
+
+/* Assuming rvw is row-major (passed from pooltool) */
+double* get_velocity(double* rvw) {
+    return &rvw[3];
+}
+
+/* Assuming rvw is row-major (passed from pooltool) */
+double* get_angular_velocity(double* rvw) {
+    return &rvw[6];
+}
+
 static inline void start_profiling_section(Profile* profile) {
     #ifdef _MSC_VER
         QueryPerformanceFrequency(&profile->freq);
@@ -428,14 +444,14 @@ DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, f
     offset[1] = translation_2[1] - translation_1[1];
     offset[2] = translation_2[2] - translation_1[2];
 
-    FLOPS(2, 3, 0, 1, complete_function, before_loop);
-    double offset_mag = sqrt(offset[0] * offset[0] + offset[1] * offset[1] + offset[2] * offset[2]);
+    FLOPS(2, 3, 1, 1, complete_function, before_loop);
+    double offset_mag = 1.0 / sqrt(offset[0] * offset[0] + offset[1] * offset[1] + offset[2] * offset[2]);
 
-    FLOPS(0, 0, 3, 0, complete_function, before_loop);
+    FLOPS(0, 3, 0, 0, complete_function, before_loop);
     double forward[3]; // Forward from ball 1 to ball 2, normalized
-    forward[0] = offset[0] / offset_mag;
-    forward[1] = offset[1] / offset_mag;
-    forward[2] = offset[2] / offset_mag;
+    forward[0] = offset[0] * offset_mag;
+    forward[1] = offset[1] * offset_mag;
+    forward[2] = offset[2] * offset_mag;
 
     FLOPS(1, 0, 0, 0, complete_function, before_loop);
     double right[3]; // Axis orthogonal to Z and forward
@@ -483,16 +499,16 @@ DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, f
     double surf_vel_2[2] = { local_vel_2[0] + R * local_ang_2[1],
             local_vel_2[1] - R * local_ang_2[0] };
 
-    FLOPS(2, 4, 0, 2, complete_function, before_loop);
-    double surf_vel_mag_1 = sqrt(surf_vel_1[0]*surf_vel_1[0] + surf_vel_1[1]*surf_vel_1[1]);
-    double surf_vel_mag_2 = sqrt(surf_vel_2[0]*surf_vel_2[0] + surf_vel_2[1]*surf_vel_2[1]);
+    FLOPS(2, 4, 0, 0, complete_function, before_loop);
+    double surf_vel_mag_1_sqrd = surf_vel_1[0]*surf_vel_1[0] + surf_vel_1[1]*surf_vel_1[1];
+    double surf_vel_mag_2_sqrd = surf_vel_2[0]*surf_vel_2[0] + surf_vel_2[1]*surf_vel_2[1];
 
     // Relative surface velocity in the x-direction at the point where the two balls are in contact.
     // ball-ball slip
-    FLOPS(5, 4, 0, 1, complete_function, before_loop);
+    FLOPS(5, 4, 0, 0, complete_function, before_loop);
     double contact_vel[2] = { local_vel_1[0] - local_vel_2[0] - R * (local_ang_1[2] + local_ang_2[2]),
             R * (local_ang_1[0] + local_ang_2[0]) };
-    double ball_ball_contact_mag = sqrt(contact_vel[0]*contact_vel[0] + contact_vel[1]*contact_vel[1]);
+    double ball_ball_contact_mag_sqrd = contact_vel[0]*contact_vel[0] + contact_vel[1]*contact_vel[1];
 
     FLOPS(1, 0, 0, 0, complete_function, before_loop);
     // Main collision loop
@@ -505,8 +521,8 @@ DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, f
         deltaP = 0.5 * (1.0 + e_b) * M * fabs(velocity_diff_y)/(double)N;
     }
 
-    FLOPS(0, 2, 1, 0, complete_function, before_loop);
-    double C = 5.0 / (2.0 * M * R);
+    FLOPS(0, 1, 1, 0, complete_function, before_loop);
+    double C = 2.5 / (M * R);
     double total_work = 0; // Work done due to impulse force
     double work_required = INFINITY; // Total amount of work required before collision handling is complete
     double work_compression = 0;
@@ -534,13 +550,14 @@ DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, f
         #endif
 
         // Impulse Calculation
-        if (ball_ball_contact_mag < 1e-16) {
+        if (ball_ball_contact_mag_sqrd < 1e-32) {
             deltaP_ball[0] = deltaP_ball[1] = 0;
             deltaP_axis_1[0] = deltaP_axis_1[1] = 0;
             deltaP_axis_2[0] = deltaP_axis_2[1] = 0;
         } else {
-            FLOPS(1, 2, 1, 0, complete_function, loop);
-            FLOPS_SINGLE_LOOP(1, 2, 1, 0);
+            FLOPS(1, 2, 1, 1, complete_function, loop);
+            FLOPS_SINGLE_LOOP(1, 2, 1, 1);
+            double ball_ball_contact_mag = sqrt(ball_ball_contact_mag_sqrd);
             deltaP_ball[0] = -u_b * deltaP * contact_vel[0] / ball_ball_contact_mag;
             if(fabs(contact_vel[1]) < 1e-16) {
                 deltaP_ball[1] = 0;
@@ -552,21 +569,23 @@ DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, f
                 deltaP_ball[1] = -u_b * deltaP * contact_vel[1] / ball_ball_contact_mag;
                 if(deltaP_ball[1] > 0) {
                     deltaP_axis_1[0] = deltaP_axis_1[1] = 0;
-                    if(surf_vel_mag_2 == 0.0) {
+                    if(surf_vel_mag_2_sqrd == 0.0) {
                         deltaP_axis_2[0] = deltaP_axis_2[1] = 0;
                     } else {
-                        FLOPS(2, 4, 2, 0, complete_function, loop);
-                        FLOPS_SINGLE_LOOP(2, 4, 2, 0);
+                        FLOPS(2, 4, 2, 1, complete_function, loop);
+                        FLOPS_SINGLE_LOOP(2, 4, 2, 1);
+                        double surf_vel_mag_2 = sqrt(surf_vel_mag_2_sqrd);
                         deltaP_axis_2[0] = -u_s2 * (surf_vel_2[0]/surf_vel_mag_2) * deltaP_ball[1];
                         deltaP_axis_2[1] = -u_s2 * (surf_vel_2[1]/surf_vel_mag_2) * deltaP_ball[1];
                     }
                 } else {
                     deltaP_axis_2[0] = deltaP_axis_2[1] = 0;
-                    if(surf_vel_mag_1 == 0.0) {
+                    if(surf_vel_mag_1_sqrd == 0.0) {
                         deltaP_axis_1[0] = deltaP_axis_1[1] = 0;
                     } else {
-                        FLOPS(0, 4, 2, 0, complete_function, loop);
-                        FLOPS_SINGLE_LOOP(0, 4, 2, 0);
+                        FLOPS(0, 4, 2, 1, complete_function, loop);
+                        FLOPS_SINGLE_LOOP(0, 4, 2, 1);
+                        double surf_vel_mag_1 = sqrt(surf_vel_mag_1_sqrd);
                         deltaP_axis_1[0] = u_s1 * (surf_vel_1[0]/surf_vel_mag_1) * deltaP_ball[1];
                         deltaP_axis_1[1] = u_s1 * (surf_vel_1[1]/surf_vel_mag_1) * deltaP_ball[1];
                     }
@@ -601,17 +620,17 @@ DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, f
         surf_vel_2[0] = local_vel_2[0] + R * local_ang_2[1];
         surf_vel_2[1] = local_vel_2[1] - R * local_ang_2[0];
 
-        FLOPS(2, 4, 0, 2, complete_function, loop);
-        FLOPS_SINGLE_LOOP(2, 4, 0, 2);
-        surf_vel_mag_1 = sqrt(surf_vel_1[0]*surf_vel_1[0] + surf_vel_1[1]*surf_vel_1[1]);
-        surf_vel_mag_2 = sqrt(surf_vel_2[0]*surf_vel_2[0] + surf_vel_2[1]*surf_vel_2[1]);
+        FLOPS(2, 4, 0, 0, complete_function, loop);
+        FLOPS_SINGLE_LOOP(2, 4, 0, 0);
+        surf_vel_mag_1_sqrd = surf_vel_1[0]*surf_vel_1[0] + surf_vel_1[1]*surf_vel_1[1];
+        surf_vel_mag_2_sqrd = surf_vel_2[0]*surf_vel_2[0] + surf_vel_2[1]*surf_vel_2[1];
 
-        FLOPS(5, 4, 0, 1, complete_function, loop);
-        FLOPS_SINGLE_LOOP(5, 4, 0, 1);
+        FLOPS(5, 4, 0, 0, complete_function, loop);
+        FLOPS_SINGLE_LOOP(5, 4, 0, 0);
         // update ball-ball slip:
         contact_vel[0] = local_vel_1[0] - local_vel_2[0] - R * (local_ang_1[2] + local_ang_2[2]);
         contact_vel[1] = R * (local_ang_1[0] + local_ang_2[0]);
-        ball_ball_contact_mag = sqrt(contact_vel[0]*contact_vel[0] + contact_vel[1]*contact_vel[1]);
+        ball_ball_contact_mag_sqrd = contact_vel[0]*contact_vel[0] + contact_vel[1]*contact_vel[1];
 
         FLOPS(3, 2, 0, 0, complete_function, loop);
         FLOPS_SINGLE_LOOP(3, 2, 0, 0);
@@ -658,19 +677,4 @@ DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, f
 
     END_PROFILE(after_loop);
     END_PROFILE(complete_function);
-}
-
-/* Assuming rvw is row-major (passed from pooltool) */
-double* get_displacement(double* rvw) {
-    return rvw;
-}
-
-/* Assuming rvw is row-major (passed from pooltool) */
-double* get_velocity(double* rvw) {
-    return &rvw[3];
-}
-
-/* Assuming rvw is row-major (passed from pooltool) */
-double* get_angular_velocity(double* rvw) {
-    return &rvw[6];
 }
