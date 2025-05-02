@@ -429,9 +429,10 @@ DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, f
     START_PROFILE(complete_function);
     START_PROFILE(before_loop);
 
-    FLOPS(2, 0, 0, 0, complete_function, before_loop);
+    FLOPS(2, 0, 1, 0, complete_function, before_loop);
     u_b = -u_b;
     u_s2 = -u_s2;
+    float M_rep = 1.0f / M;
 
      // Get pointers into the state arrays
     MEMORY(18, complete_function, before_loop);
@@ -526,7 +527,7 @@ DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, f
     }
 
     FLOPS(0, 1, 1, 0, complete_function, before_loop);
-    double C = 2.5 / (M * R);
+    double C = 2.5 * M_rep / R;
     double total_work = 0; // Work done due to impulse force
     double work_required = INFINITY; // Total amount of work required before collision handling is complete
     double work_compression = 0;
@@ -554,57 +555,58 @@ DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, f
         #endif
 
         // Impulse Calculation
-        if (ball_ball_contact_mag_sqrd < 1e-32) {
-            deltaP_ball[0] = deltaP_ball[1] = 0;
-            deltaP_axis_1[0] = deltaP_axis_1[1] = 0;
-            deltaP_axis_2[0] = deltaP_axis_2[1] = 0;
-        } else {
+        // TODO: I think in 99% of cases this will be true, maybe its faster to just skip this if and do it in the end
+        if (ball_ball_contact_mag_sqrd >= 1e-32) {
             FLOPS(0, 2, 1, 1, complete_function, loop);
             FLOPS_SINGLE_LOOP(0, 2, 1, 1);
             // TODO: Could be optimized by using reciprocal sqrt, but intrinsics only support floats
             double ball_ball_contact_mag = sqrt(ball_ball_contact_mag_sqrd);
             deltaP_ball[0] = u_b * deltaP * contact_vel[0] / ball_ball_contact_mag;
-            if(fabs(contact_vel[1]) < 1e-16) {
-                deltaP_ball[1] = 0;
-                deltaP_axis_1[0] = deltaP_axis_1[1] = 0;
-                deltaP_axis_2[0] = deltaP_axis_2[1] = 0;
-            } else {
+            if(fabs(contact_vel[1]) >= 1e-16) {
                 FLOPS(0, 2, 1, 0, complete_function, loop);
                 FLOPS_SINGLE_LOOP(0, 2, 1, 0);
                 deltaP_ball[1] = u_b * deltaP * contact_vel[1] / ball_ball_contact_mag;
                 if(deltaP_ball[1] > 0) {
                     deltaP_axis_1[0] = deltaP_axis_1[1] = 0;
-                    if(surf_vel_mag_2_sqrd == 0.0) {
-                        deltaP_axis_2[0] = deltaP_axis_2[1] = 0;
-                    } else {
+                    if(surf_vel_mag_2_sqrd != 0.0) {
                         FLOPS(0, 4, 2, 1, complete_function, loop);
                         FLOPS_SINGLE_LOOP(0, 4, 2, 1);
                         double surf_vel_mag_2 = sqrt(surf_vel_mag_2_sqrd);
                         deltaP_axis_2[0] = u_s2 * (surf_vel_2[0]/surf_vel_mag_2) * deltaP_ball[1];
                         deltaP_axis_2[1] = u_s2 * (surf_vel_2[1]/surf_vel_mag_2) * deltaP_ball[1];
+                    } else {
+                        deltaP_axis_2[0] = deltaP_axis_2[1] = 0;
                     }
                 } else {
                     deltaP_axis_2[0] = deltaP_axis_2[1] = 0;
-                    if(surf_vel_mag_1_sqrd == 0.0) {
-                        deltaP_axis_1[0] = deltaP_axis_1[1] = 0;
-                    } else {
+                    if(surf_vel_mag_1_sqrd != 0.0) {
                         FLOPS(0, 4, 2, 1, complete_function, loop);
                         FLOPS_SINGLE_LOOP(0, 4, 2, 1);
                         double surf_vel_mag_1 = sqrt(surf_vel_mag_1_sqrd);
                         deltaP_axis_1[0] = u_s1 * (surf_vel_1[0]/surf_vel_mag_1) * deltaP_ball[1];
                         deltaP_axis_1[1] = u_s1 * (surf_vel_1[1]/surf_vel_mag_1) * deltaP_ball[1];
+                    } else {
+                        deltaP_axis_1[0] = deltaP_axis_1[1] = 0;
                     }
                 }
+            } else {
+                deltaP_ball[1] = 0;
+                deltaP_axis_1[0] = deltaP_axis_1[1] = 0;
+                deltaP_axis_2[0] = deltaP_axis_2[1] = 0;
             }
+        } else {
+            deltaP_ball[0] = deltaP_ball[1] = 0;
+            deltaP_axis_1[0] = deltaP_axis_1[1] = 0;
+            deltaP_axis_2[0] = deltaP_axis_2[1] = 0;
         }
 
-        FLOPS(10, 0, 4, 0, complete_function, loop);
-        FLOPS_SINGLE_LOOP(10, 0, 4, 0);
+        FLOPS(10, 4, 0, 0, complete_function, loop);
+        FLOPS_SINGLE_LOOP(10, 4, 0, 0);
         // Update velocities
-        local_vel_1[0] += (deltaP_ball[0] + deltaP_axis_1[0]) / M;
-        local_vel_1[1] += (-deltaP + deltaP_axis_1[1]) / M;
-        local_vel_2[0] += (-deltaP_ball[0] + deltaP_axis_2[0]) / M;
-        local_vel_2[1] += (deltaP + deltaP_axis_2[1]) / M;
+        local_vel_1[0] += (deltaP_ball[0] + deltaP_axis_1[0]) * M_rep;
+        local_vel_1[1] += (-deltaP + deltaP_axis_1[1]) * M_rep;
+        local_vel_2[0] += (-deltaP_ball[0] + deltaP_axis_2[0]) * M_rep;
+        local_vel_2[1] += (deltaP + deltaP_axis_2[1]) * M_rep;
 
         FLOPS(12, 6, 0, 0, complete_function, loop);
         FLOPS_SINGLE_LOOP(12, 6, 0, 0);
