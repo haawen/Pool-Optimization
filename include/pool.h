@@ -6,7 +6,12 @@
 #else
     #define DLL_EXPORT
 #endif
-
+#ifdef _MSC_VER
+    #include <intrin.h>
+    #include <windows.h>
+#else
+    #include <x86intrin.h>
+#endif
 
 #include <time.h>
     #include <stdint.h>

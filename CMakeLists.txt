@@ -20,7 +20,7 @@ add_library(pool_shared SHARED ${SOURCES})
 include_directories(${UNITY_DIR})
 add_executable(profiling src/profiling.c ${SOURCES} ${UNITY_DIR}/unity.c)
 target_compile_definitions(profiling PRIVATE PROFILE)
-target_compile_options(profiling PRIVATE -O3 -ffast-math -march=native -Wall -Wextra -pedantic)
+target_compile_options(profiling PRIVATE -O3 -ffast-math -march=native -Wall -pedantic)
 target_compile_definitions(profiling PRIVATE UNITY_INCLUDE_DOUBLE)
 
 add_executable(flops src/flops.c ${SOURCES})
