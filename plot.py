@@ -149,13 +149,62 @@ for opi, op in enumerate(["ADDS", "MULS", "DIVS", "SQRT"]):
 
 # Cost per func
 #
-
 op_colors = {
     "ADDS": "green",
     "MULS": "blue",
     "DIVS": "orange",
     "SQRT": "RED",
+    "Nanoseconds": "yellow",
 }
+
+section_colors = {
+    "Initialization": "green",
+    "Loop": "blue",
+    "Single Loop Iteration": "orange",
+    "Transform to World Frame": "red",
+    "collide_balls": "yellow",
+}
+
+
+def bar_plot_by_testcase(column, width=0.1):
+    tc = list(df["Test Case"].unique())
+    sections = list(df["Section"].unique())
+    x = np.arange(len(tc))
+
+    for f, data in df.groupby("Function"):
+        groups = data.groupby(["Test Case", "Section"])[[column]].mean()
+
+        fig, ax = plt.subplots(figsize=(12, 6))
+
+        for testcase in tc:
+            offset = -len(sections) / 2 * width
+            for section in sections:
+                rects = plt.bar(
+                    x[tc.index(testcase)] + offset,
+                    round(groups.loc[(testcase, section), column]),
+                    width=width,
+                    label=section,
+                    color=section_colors[section],
+                )
+                plt.bar_label(rects, padding=3)
+                offset += width
+
+        plt.xlabel("Testcase")
+        plt.xticks(x, tc)
+        plt.yscale("log")  # Only set the Y-axis to log scale
+        plt.ylabel(column)
+
+        handles, labels = ax.get_legend_handles_labels()
+        by_label = dict(zip(labels, handles))
+        ax.legend(by_label.values(), by_label.keys(), title="Section")
+
+        plt.tight_layout()
+
+        plt.savefig(f"plots/{column}_{f}.png")
+
+
+bar_plot_by_testcase("Nanoseconds")
+bar_plot_by_testcase("Cycles")
 
 for f, data in flops.groupby("Function"):
     groups = data.groupby(["Section"])[["ADDS", "MULS", "DIVS", "SQRT"]].mean()
