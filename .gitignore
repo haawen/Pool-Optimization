@@ -7,3 +7,6 @@ pooltool-dev/
 .vscode
 
 uv.lock
+
+plots/*
+!plots/.gitkeep
