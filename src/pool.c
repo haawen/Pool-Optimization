@@ -526,6 +526,10 @@ DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, f
         deltaP = 0.5 * (1.0 + e_b) * M * fabs(velocity_diff_y)/(double)N;
     }
 
+    FLOPS(0, 2, 0, 0, complete_function, before_loop);
+    float half_deltaP = 0.5 * deltaP;
+    float e_b_sqrd_plus_1 = e_b * e_b + 1;
+
     FLOPS(0, 1, 1, 0, complete_function, before_loop);
     double C = 2.5 * M_rep / R;
     double total_work = 0; // Work done due to impulse force
@@ -645,35 +649,37 @@ DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, f
         FLOPS(4, 4, 0, 0, complete_function, loop);
         FLOPS_SINGLE_LOOP(4, 4, 0, 0);
         // Recalculate surface velocities using the updated arrays
+        double local_ang_1_0_R = R * local_ang_1[0];
+        double local_ang_2_0_R = R * local_ang_2[0];
         surf_vel_1[0] = local_vel_1[0] + R * local_ang_1[1];
-        surf_vel_1[1] = local_vel_1[1] - R * local_ang_1[0];
+        surf_vel_1[1] = local_vel_1[1] - local_ang_1_0_R;
         surf_vel_2[0] = local_vel_2[0] + R * local_ang_2[1];
-        surf_vel_2[1] = local_vel_2[1] - R * local_ang_2[0];
+        surf_vel_2[1] = local_vel_2[1] - local_ang_2_0_R;
 
         FLOPS(2, 4, 0, 0, complete_function, loop);
         FLOPS_SINGLE_LOOP(2, 4, 0, 0);
         surf_vel_mag_1_sqrd = surf_vel_1[0]*surf_vel_1[0] + surf_vel_1[1]*surf_vel_1[1];
         surf_vel_mag_2_sqrd = surf_vel_2[0]*surf_vel_2[0] + surf_vel_2[1]*surf_vel_2[1];
 
-        FLOPS(5, 4, 0, 0, complete_function, loop);
-        FLOPS_SINGLE_LOOP(5, 4, 0, 0);
+        FLOPS(5, 2, 0, 0, complete_function, loop);
+        FLOPS_SINGLE_LOOP(5, 2, 0, 0);
         // update ball-ball slip:
         contact_vel[0] = local_vel_1[0] - local_vel_2[0] - R * (local_ang_1[2] + local_ang_2[2]);
-        contact_vel[1] = R * (local_ang_1[0] + local_ang_2[0]);
+        contact_vel[1] = local_ang_1_0_R + local_ang_2_0_R;
         ball_ball_contact_mag_sqrd = contact_vel[0]*contact_vel[0] + contact_vel[1]*contact_vel[1];
 
-        FLOPS(3, 2, 0, 0, complete_function, loop);
-        FLOPS_SINGLE_LOOP(3, 2, 0, 0);
+        FLOPS(3, 1, 0, 0, complete_function, loop);
+        FLOPS_SINGLE_LOOP(3, 1, 0, 0);
         // Update work and check compression phase
         double prev_diff = velocity_diff_y;
         velocity_diff_y = local_vel_2[1] - local_vel_1[1];
-        total_work += 0.5 * deltaP * fabs(prev_diff + velocity_diff_y);
+        total_work += half_deltaP * fabs(prev_diff + velocity_diff_y);
 
         if (work_compression == 0 && velocity_diff_y > 0) {
             work_compression = total_work;
-            FLOPS(1, 2, 0, 0, complete_function, loop);
-            FLOPS_SINGLE_LOOP(1, 2, 0, 0);
-            work_required = (1.0 + e_b * e_b) * work_compression;
+            FLOPS(0, 1, 0, 0, complete_function, loop);
+            FLOPS_SINGLE_LOOP(0, 1, 0, 0);
+            work_required = e_b_sqrd_plus_1 * work_compression;
         }
 
         #ifdef PROFILE
