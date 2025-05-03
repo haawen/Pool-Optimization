@@ -540,14 +540,15 @@ DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, f
     // Delta impulse overall per ball?
     // Impulse per axis per ball
 
-    double deltaP_ball[2] = { 0, 0 };
-    double deltaP_ball_C[2] = { 0, 0 }; // Multiplied by C
+    // Initialization not needed, will be overwritten anyways.
+    double deltaP_ball[2];
+    double deltaP_ball_C[2]; // Multiplied by C
 
-    double deltaP_axis_1[2] = { 0, 0 };
-    double deltaP_axis_1_C[2] = { 0, 0 }; // Multiplied by C
+    double deltaP_axis_1[2];
+    double deltaP_axis_1_C[2]; // Multiplied by C
 
-    double deltaP_axis_2[2] = { 0, 0 };
-    double deltaP_axis_2_C[2] = { 0, 0 }; // Multiplied by C
+    double deltaP_axis_2[2];
+    double deltaP_axis_2_C[2]; // Multiplied by C
 
     END_PROFILE(before_loop);
     START_PROFILE(loop);
@@ -555,6 +556,16 @@ DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, f
     #ifdef PROFILE
          bool first_iter = true;
     #endif
+
+    double ball_ball_contact_mag;
+    double delta_ball_precomp;
+    double surf_vel_mag_1;
+    double surf_vel_mag_2;
+    double surf_vel_precomp;
+    double local_ang_1_0_R;
+    double local_ang_2_0_R;
+    double prev_diff;
+
     while (velocity_diff_y < 0 || total_work < work_required) {
 
         #ifdef PROFILE
@@ -569,8 +580,8 @@ DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, f
             FLOPS(0, 3, 1, 1, complete_function, loop);
             FLOPS_SINGLE_LOOP(0, 3, 1, 1);
             // TODO: Could be optimized by using reciprocal sqrt, but intrinsics only support floats
-            double ball_ball_contact_mag = sqrt(ball_ball_contact_mag_sqrd);
-            double delta_ball_precomp = u_b * deltaP / ball_ball_contact_mag;
+            ball_ball_contact_mag = sqrt(ball_ball_contact_mag_sqrd);
+            delta_ball_precomp = u_b * deltaP / ball_ball_contact_mag;
             deltaP_ball[0] = delta_ball_precomp * contact_vel[0];
             deltaP_ball_C[0] = C * deltaP_ball[0];
 
@@ -585,8 +596,8 @@ DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, f
                     if(surf_vel_mag_2_sqrd != 0.0) {
                         FLOPS(0, 6, 2, 1, complete_function, loop);
                         FLOPS_SINGLE_LOOP(0, 5, 1, 1);
-                        double surf_vel_mag_2 = sqrt(surf_vel_mag_2_sqrd);
-                        double surf_vel_precomp = u_s2 * deltaP_ball[1] / surf_vel_mag_2;
+                        surf_vel_mag_2 = sqrt(surf_vel_mag_2_sqrd);
+                        surf_vel_precomp = u_s2 * deltaP_ball[1] / surf_vel_mag_2;
                         deltaP_axis_2[0] = surf_vel_precomp * surf_vel_2[0];
                         deltaP_axis_2[1] = surf_vel_precomp * surf_vel_2[1];
                         deltaP_axis_2_C[0] = C * deltaP_axis_2[0];
@@ -601,8 +612,8 @@ DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, f
                     if(surf_vel_mag_1_sqrd != 0.0) {
                         FLOPS(0, 5, 1, 1, complete_function, loop);
                         FLOPS_SINGLE_LOOP(0, 5, 1, 1);
-                        double surf_vel_mag_1 = sqrt(surf_vel_mag_1_sqrd);
-                        double surf_vel_precomp = u_s1 * deltaP_ball[1] / surf_vel_mag_1;
+                        surf_vel_mag_1 = sqrt(surf_vel_mag_1_sqrd);
+                        surf_vel_precomp = u_s1 * deltaP_ball[1] / surf_vel_mag_1;
                         deltaP_axis_1[0] = surf_vel_precomp * surf_vel_1[0];
                         deltaP_axis_1[1] = surf_vel_precomp * surf_vel_1[1];
                         deltaP_axis_1_C[0] = C * deltaP_axis_1[0];
@@ -651,8 +662,8 @@ DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, f
         FLOPS(4, 4, 0, 0, complete_function, loop);
         FLOPS_SINGLE_LOOP(4, 4, 0, 0);
         // Recalculate surface velocities using the updated arrays
-        double local_ang_1_0_R = R * local_ang_1[0];
-        double local_ang_2_0_R = R * local_ang_2[0];
+        local_ang_1_0_R = R * local_ang_1[0];
+        local_ang_2_0_R = R * local_ang_2[0];
         surf_vel_1[0] = local_vel_1[0] + R * local_ang_1[1];
         surf_vel_1[1] = local_vel_1[1] - local_ang_1_0_R;
         surf_vel_2[0] = local_vel_2[0] + R * local_ang_2[1];
@@ -673,7 +684,7 @@ DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, f
         FLOPS(3, 1, 0, 0, complete_function, loop);
         FLOPS_SINGLE_LOOP(3, 1, 0, 0);
         // Update work and check compression phase
-        double prev_diff = velocity_diff_y;
+        prev_diff = velocity_diff_y;
         velocity_diff_y = local_vel_2[1] - local_vel_1[1];
         total_work += half_deltaP * fabs(prev_diff + velocity_diff_y);
 
