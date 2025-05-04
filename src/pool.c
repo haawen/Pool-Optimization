@@ -412,7 +412,7 @@ DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, floa
 }
 
 
-DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double* rvw1_result, double* rvw2_result, Profile* profiles, Branch* branches) {
+DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float Rf, float Mf, float u_s1f, float u_s2f, float u_bf, float e_bf, float deltaPf, int N, double* rvw1_result, double* rvw2_result, Profile* profiles, Branch* branches) {
 
     #ifdef PROFILE
         Profile* complete_function = &profiles[0];
@@ -434,9 +434,16 @@ DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, f
     START_PROFILE(before_loop);
 
     FLOPS(2, 0, 1, 0, complete_function, before_loop);
-    u_b = -u_b;
-    u_s2 = -u_s2;
-    float M_rep = 1.0f / M;
+
+    double R = (double)Rf;
+    double M = (double)Mf;
+    double u_s1 = (double)u_s1f;
+    double u_s2 = -(double)u_s2f;
+    double u_b = -(double)u_bf;
+    double e_b = (double)e_bf;
+    double deltaP = (double)deltaPf;
+
+    double M_rep = 1.0f / M;
 
      // Get pointers into the state arrays
     MEMORY(18, complete_function, before_loop);
