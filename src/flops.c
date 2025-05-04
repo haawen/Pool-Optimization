@@ -179,7 +179,7 @@ void call_function(const char* name, CollideBallsFn collide_fn) {
         return;
     }
 
-    Profile profiles[5];
+    Profile profiles[6];
 
     for(int i = 0; i < TEST_CASES; i++) {
         double rvw1_result[9];
@@ -202,9 +202,10 @@ void call_function(const char* name, CollideBallsFn collide_fn) {
 
         fprintf(csv, "%s,%s,%d,%ld,%ld,%ld,%ld,%ld,%ld\n", name, "collide_balls", i, profiles[0].flops, profiles[0].memory * sizeof(double), profiles[0].ADDS, profiles[0].MULS, profiles[0].DIVS, profiles[0].SQRT);
         fprintf(csv, "%s,%s,%d,%ld,%ld,%ld,%ld,%ld,%ld\n", name, "Initialization", i, profiles[1].flops, profiles[1].memory* sizeof(double), profiles[1].ADDS, profiles[1].MULS, profiles[1].DIVS, profiles[1].SQRT);
-        fprintf(csv, "%s,%s,%d,%ld,%ld,%ld,%ld,%ld,%ld\n", name, "Loop", i, profiles[2].flops, profiles[2].memory* sizeof(double), profiles[2].ADDS, profiles[2].MULS, profiles[2].DIVS, profiles[2].SQRT);
-        fprintf(csv, "%s,%s,%d,%ld,%ld,%ld,%ld,%ld,%ld\n", name, "Single Loop Iteration", i, profiles[3].flops, profiles[3].memory* sizeof(double), profiles[3].ADDS, profiles[3].MULS, profiles[3].DIVS, profiles[3].SQRT);
-        fprintf(csv, "%s,%s,%d,%ld,%ld,%ld,%ld,%ld,%ld\n", name, "Transform to World Frame", i, profiles[4].flops, profiles[4].memory* sizeof(double), profiles[4].ADDS, profiles[4].MULS, profiles[4].DIVS, profiles[4].SQRT);
+        fprintf(csv, "%s,%s,%d,%ld,%ld,%ld,%ld,%ld,%ld\n", name, "Impulse", i, profiles[2].flops, profiles[2].memory* sizeof(double), profiles[2].ADDS, profiles[2].MULS, profiles[2].DIVS, profiles[2].SQRT);
+        fprintf(csv, "%s,%s,%d,%ld,%ld,%ld,%ld,%ld,%ld\n", name, "Delta", i, profiles[3].flops, profiles[3].memory* sizeof(double), profiles[3].ADDS, profiles[3].MULS, profiles[3].DIVS, profiles[3].SQRT);
+        fprintf(csv, "%s,%s,%d,%ld,%ld,%ld,%ld,%ld,%ld\n", name, "Velocity", i, profiles[4].flops, profiles[4].memory* sizeof(double), profiles[4].ADDS, profiles[4].MULS, profiles[4].DIVS, profiles[4].SQRT);
+        fprintf(csv, "%s,%s,%d,%ld,%ld,%ld,%ld,%ld,%ld\n", name, "Transform to World Frame", i, profiles[5].flops, profiles[5].memory* sizeof(double), profiles[5].ADDS, profiles[5].MULS, profiles[5].DIVS, profiles[5].SQRT);
     }
 
     fclose(csv);

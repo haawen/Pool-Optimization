@@ -35,25 +35,10 @@
         } \
     } while(0)
 
-    #define FLOPS_SINGLE_LOOP(adds, muls, divs, sqrt) \
-        if(first_iter) { \
-        single_loop_iteration->flops += (adds + muls + divs + sqrt); \
-        single_loop_iteration->ADDS += (adds); \
-        single_loop_iteration->MULS += (muls); \
-        single_loop_iteration->DIVS += (divs); \
-        single_loop_iteration->SQRT += (sqrt); \
-        }
-
-    #define MEMORY_SINGLE_LOOP(count) \
-        if(first_iter) { \
-        single_loop_iteration->memory += count; \
-        }
 #else
 
 #define FLOPS(adds, muls, divs, sqrt, ...)
 #define MEMORY(count, ...)
-#define FLOPS_SINGLE_LOOP(adds, muls, divs, sqrt)
-#define MEMORY_SINGLE_LOOP(count)
 
 #endif
 
@@ -84,42 +69,56 @@ double* get_angular_velocity(double* rvw) {
     return &rvw[6];
 }
 
-static inline void start_profiling_section(Profile* profile) {
+static inline void init_profiling_section(Profile* profile) {
     #ifdef _MSC_VER
         QueryPerformanceFrequency(&profile->freq);
+    #endif
+    profile->cycle_start = 0;
+    profile->cycles_cumulative = 0;
+    profile->ts_cumulative = 0;
+    profile->flops = 0;
+    profile->memory = 0;
+    profile->ADDS = 0;
+    profile->MULS = 0;
+    profile->DIVS = 0;
+    profile->SQRT = 0;
+}
+
+static inline void start_profiling_section(Profile* profile) {
+    #ifdef _MSC_VER
         QueryPerformanceCounter(&profile->start_counter);
     #else
         clock_gettime(CLOCK_MONOTONIC, &profile->start_ts);
     #endif
     profile->cycle_start = __rdtsc();
-    profile->flops = 0;
-    profile->memory = 0;
-    profile->ADDS= 0;
-    profile->MULS= 0;
-    profile->DIVS= 0;
-    profile->SQRT= 0;
 }
 
 static inline void end_profiling_section(Profile* profile) {
     #ifdef _MSC_VER
         QueryPerformanceCounter(&profile->end_counter);
-        // unsigned long long ns_init = (unsigned long long)(((end_counter_init.QuadPart - start_counter_init.QuadPart) * 1e9) / freq_init.QuadPart);
     #else
         clock_gettime(CLOCK_MONOTONIC, &profile->end_ts);
-        //unsigned long long ns_init = (end_ts_init.tv_sec - start_ts_init.tv_sec) * 1000000000ULL
-        //                            + (end_ts_init.tv_nsec - start_ts_init.tv_nsec);
+    #endif
+
+    #ifdef _MSC_VER
+        profile->ts_cumulative += (unsigned long long)(((profile->end_counter.QuadPart - profile->start_counter.QuadPart) * 1e9) / profile->freq.QuadPart);
+    #else
+        profile->ts_cumulative += (profile->end_ts.tv_sec - profile->start_ts.tv_sec) * 1000000000ULL + (profile->end_ts.tv_nsec - profile->start_ts.tv_nsec);
     #endif
 
     profile->cycle_end = __rdtsc();
+    profile->cycles_cumulative += profile->cycle_end - profile->cycle_start;
 }
 
 #ifdef PROFILE
 
+#define INIT(profile) init_profiling_section(profile)
 #define START_PROFILE(profile) start_profiling_section(profile)
 #define END_PROFILE(profile) end_profiling_section(profile)
 
 #else
 
+#define INIT(profile)
 #define START_PROFILE(profile)
 #define END_PROFILE(profile)
 
@@ -130,10 +129,18 @@ DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, floa
     #ifdef PROFILE
         Profile* complete_function = &profiles[0];
         Profile* before_loop = &profiles[1];
-        Profile* loop = &profiles[2];
-        Profile* single_loop_iteration = &profiles[3];
-        Profile* after_loop = &profiles[4];
+        Profile* impulse = &profiles[2];
+        Profile* delta = &profiles[3];
+        Profile* velocity = &profiles[4];
+        Profile* after_loop = &profiles[5];
     #endif
+
+    INIT(complete_function);
+    INIT(before_loop);
+    INIT(impulse);
+    INIT(delta);
+    INIT(velocity);
+    INIT(after_loop);
 
     START_PROFILE(complete_function);
     START_PROFILE(before_loop);
@@ -241,19 +248,10 @@ DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, floa
     double deltaP_y_2 = 0;
 
     END_PROFILE(before_loop);
-    START_PROFILE(loop);
-
-    #ifdef PROFILE
-         bool first_iter = true;
-    #endif
 
     while (velocity_diff_y < 0 || total_work < work_required) {
 
-        #ifdef PROFILE
-            if(first_iter) {
-                START_PROFILE(single_loop_iteration);
-            }
-        #endif
+        START_PROFILE(impulse);
 
         // Impulse Calculation
         if (ball_ball_contact_point_magnitude < 1e-16) {
@@ -265,8 +263,7 @@ DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, floa
             deltaP_y_2 = 0;
         } else {
 
-            FLOPS(1, 2, 1, 0, complete_function, loop);
-            FLOPS_SINGLE_LOOP(1, 2, 1, 0);
+            FLOPS(1, 2, 1, 0, complete_function, impulse);
             deltaP_1 = -u_b * deltaP * contact_point_velocity_x / ball_ball_contact_point_magnitude;
             if(fabs(contact_point_velocity_z) < 1e-16) {
                 deltaP_2 = 0;
@@ -275,8 +272,7 @@ DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, floa
                 deltaP_x_2 = 0;
                 deltaP_y_2 = 0;
             } else {
-                FLOPS(1, 2, 1, 0, complete_function, loop);
-                FLOPS_SINGLE_LOOP(1, 2, 1, 0);
+                FLOPS(1, 2, 1, 0, complete_function, impulse);
                 deltaP_2 = -u_b * deltaP * contact_point_velocity_z / ball_ball_contact_point_magnitude;
 
                 if(deltaP_2 > 0) {
@@ -288,8 +284,7 @@ DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, floa
                         deltaP_x_2 = 0;
                         deltaP_y_2 = 0;
                     } else {
-                        FLOPS(2, 4, 2, 0, complete_function, loop);
-                        FLOPS_SINGLE_LOOP(2, 4, 2, 0);
+                        FLOPS(2, 4, 2, 0, complete_function, impulse);
                         deltaP_x_2 = -u_s2 * (surface_velocity_x_2 / surface_velocity_magnitude_2) * deltaP_2;
                         deltaP_y_2 = -u_s2 * (surface_velocity_y_2 / surface_velocity_magnitude_2) * deltaP_2;
                     }
@@ -300,8 +295,7 @@ DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, floa
                         deltaP_x_1 = 0;
                         deltaP_y_1 = 0;
                     } else {
-                        FLOPS(0, 4, 2, 0, complete_function, loop);
-                        FLOPS_SINGLE_LOOP(0, 4, 2, 0);
+                        FLOPS(0, 4, 2, 0, complete_function, impulse);
                         deltaP_x_1 = u_s1 * (surface_velocity_x_1 / surface_velocity_magnitude_1) * deltaP_2;
                         deltaP_y_1 = u_s1 * (surface_velocity_y_1 / surface_velocity_magnitude_1) * deltaP_2;
                     }
@@ -310,24 +304,24 @@ DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, floa
             }
         }
 
-        FLOPS(6, 0, 4, 0, complete_function, loop);
-        FLOPS_SINGLE_LOOP(6, 0, 4, 0);
+        END_PROFILE(impulse);
+        START_PROFILE(delta);
+
+        FLOPS(6, 0, 4, 0, complete_function, delta);
         // Velocity changes
         double velocity_change_x_1 = (deltaP_1 + deltaP_x_1) / M;
         double velocity_change_y_1 = (-deltaP + deltaP_y_1) / M;
         double velocity_change_x_2 = (-deltaP_1 + deltaP_x_2) / M;
         double velocity_change_y_2 = (deltaP + deltaP_y_2) / M;
 
-        FLOPS(4, 0, 0, 0, complete_function, loop);
-        FLOPS_SINGLE_LOOP(4, 0, 0, 0);
+        FLOPS(4, 0, 0, 0, complete_function, delta);
         // Update velocities
         local_velocity_x_1 += velocity_change_x_1;
         local_velocity_y_1 += velocity_change_y_1;
         local_velocity_x_2 += velocity_change_x_2;
         local_velocity_y_2 += velocity_change_y_2;
 
-        FLOPS(6, 6, 0, 0, complete_function, loop);
-        FLOPS_SINGLE_LOOP(6, 6, 0, 0);
+        FLOPS(6, 6, 0, 0, complete_function, delta);
         // Angular velocity changes
         double delta_angular_velocity_x_1 = C * (deltaP_2 + deltaP_y_1);
         double delta_angular_velocity_y_1 = C * (-deltaP_x_1);
@@ -336,8 +330,7 @@ DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, floa
         double delta_angular_velocity_y_2 = C * (-deltaP_x_2);
         double delta_angular_velocity_z_2 = C * (-deltaP_1);
 
-        FLOPS(6, 0, 0, 0, complete_function, loop);
-        FLOPS_SINGLE_LOOP(6, 0, 0, 0);
+        FLOPS(6, 0, 0, 0, complete_function, delta);
         // Update Angular Velocities
         local_angular_velocity_x_1 += delta_angular_velocity_x_1;
         local_angular_velocity_y_1 += delta_angular_velocity_y_1;
@@ -347,28 +340,27 @@ DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, floa
         local_angular_velocity_y_2 += delta_angular_velocity_y_2;
         local_angular_velocity_z_2 += delta_angular_velocity_z_2;
 
-        FLOPS(4, 4, 0, 0, complete_function, loop);
-        FLOPS_SINGLE_LOOP(4, 4, 0, 0);
+        END_PROFILE(delta);
+        START_PROFILE(velocity);
+
+        FLOPS(4, 4, 0, 0, complete_function, velocity);
         // update ball-table slips
         surface_velocity_x_1 = local_velocity_x_1 + R * local_angular_velocity_y_1;
         surface_velocity_y_1 = local_velocity_y_1 - R * local_angular_velocity_x_1;
         surface_velocity_x_2 = local_velocity_x_2 + R * local_angular_velocity_y_2;
         surface_velocity_y_2 = local_velocity_y_2 - R * local_angular_velocity_x_2;
 
-        FLOPS(2, 4, 0, 2, complete_function, loop);
-        FLOPS_SINGLE_LOOP(2, 4, 0, 2);
+        FLOPS(2, 4, 0, 2, complete_function, velocity);
         surface_velocity_magnitude_1 = sqrt(surface_velocity_x_1 * surface_velocity_x_1 + surface_velocity_y_1 * surface_velocity_y_1);
         surface_velocity_magnitude_2 = sqrt(surface_velocity_x_2 * surface_velocity_x_2 + surface_velocity_y_2 * surface_velocity_y_2);
 
-        FLOPS(5, 4, 0, 1, complete_function, loop);
-        FLOPS_SINGLE_LOOP(5, 4, 0, 1);
+        FLOPS(5, 4, 0, 1, complete_function, velocity);
         // update ball-ball slip:
         contact_point_velocity_x = local_velocity_x_1 - local_velocity_x_2 - R * (local_angular_velocity_z_1 + local_angular_velocity_z_2);
         contact_point_velocity_z = R * (local_angular_velocity_x_1 + local_angular_velocity_x_2);
         ball_ball_contact_point_magnitude = sqrt(contact_point_velocity_x * contact_point_velocity_x + contact_point_velocity_z * contact_point_velocity_z);
 
-        FLOPS(3, 2, 0, 0, complete_function, loop);
-        FLOPS_SINGLE_LOOP(3, 2, 0, 0);
+        FLOPS(3, 2, 0, 0, complete_function, velocity);
         // Update work and check compression phase
         double velocity_diff_y_temp = velocity_diff_y;
         velocity_diff_y = local_velocity_y_2 - local_velocity_y_1;
@@ -376,20 +368,13 @@ DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, floa
 
         if (work_compression == 0 && velocity_diff_y > 0) {
             work_compression = total_work;
-            FLOPS(1, 2, 0, 0, complete_function, loop);
-            FLOPS_SINGLE_LOOP(1, 2, 0, 0);
+            FLOPS(1, 2, 0, 0, complete_function, velocity);
             work_required = (1.0 + e_b * e_b) * work_compression;
         }
 
-        #ifdef PROFILE
-            if(first_iter) {
-                first_iter = false;
-                END_PROFILE(single_loop_iteration);
-            }
-        #endif
+        END_PROFILE(velocity);
     }
 
-    END_PROFILE(loop);
     START_PROFILE(after_loop);
 
     // Transform back to global coordinates
@@ -421,10 +406,18 @@ DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, f
     #ifdef PROFILE
         Profile* complete_function = &profiles[0];
         Profile* before_loop = &profiles[1];
-        Profile* loop = &profiles[2];
-        Profile* single_loop_iteration = &profiles[3];
-        Profile* after_loop = &profiles[4];
+        Profile* impulse = &profiles[2];
+        Profile* delta = &profiles[3];
+        Profile* velocity = &profiles[4];
+        Profile* after_loop = &profiles[5];
     #endif
+
+    INIT(complete_function);
+    INIT(before_loop);
+    INIT(impulse);
+    INIT(delta);
+    INIT(velocity);
+    INIT(after_loop);
 
     START_PROFILE(complete_function);
     START_PROFILE(before_loop);
@@ -550,13 +543,6 @@ DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, f
     double deltaP_axis_2[2];
     double deltaP_axis_2_C[2]; // Multiplied by C
 
-    END_PROFILE(before_loop);
-    START_PROFILE(loop);
-
-    #ifdef PROFILE
-         bool first_iter = true;
-    #endif
-
     double ball_ball_contact_mag;
     double delta_ball_precomp;
     double surf_vel_mag_1;
@@ -566,19 +552,16 @@ DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, f
     double local_ang_2_0_R;
     double prev_diff;
 
+    END_PROFILE(before_loop);
+
     while (velocity_diff_y < 0 || total_work < work_required) {
 
-        #ifdef PROFILE
-            if(first_iter) {
-                START_PROFILE(single_loop_iteration);
-            }
-        #endif
+        START_PROFILE(impulse);
 
         // Impulse Calculation
         // TODO: I think in 99% of cases this will be true, maybe its faster to just skip this if and do it in the end
         if (ball_ball_contact_mag_sqrd >= 1e-32) {
-            FLOPS(0, 3, 1, 1, complete_function, loop);
-            FLOPS_SINGLE_LOOP(0, 3, 1, 1);
+            FLOPS(0, 3, 1, 1, complete_function, impulse);
             // TODO: Could be optimized by using reciprocal sqrt, but intrinsics only support floats
             ball_ball_contact_mag = sqrt(ball_ball_contact_mag_sqrd);
             delta_ball_precomp = u_b * deltaP / ball_ball_contact_mag;
@@ -586,16 +569,14 @@ DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, f
             deltaP_ball_C[0] = C * deltaP_ball[0];
 
             if(fabs(contact_vel[1]) >= 1e-16) {
-                FLOPS(0, 3, 1, 0, complete_function, loop);
-                FLOPS_SINGLE_LOOP(0, 2, 0, 0);
+                FLOPS(0, 3, 1, 0, complete_function, impulse);
                 deltaP_ball[1] = delta_ball_precomp * contact_vel[1];
                 deltaP_ball_C[1] = C * deltaP_ball[1];
                 if(deltaP_ball[1] > 0) {
                     deltaP_axis_1[0] = deltaP_axis_1[1] = 0;
                     deltaP_axis_1_C[0] = deltaP_axis_1_C[1] = 0;
                     if(surf_vel_mag_2_sqrd != 0.0) {
-                        FLOPS(0, 6, 2, 1, complete_function, loop);
-                        FLOPS_SINGLE_LOOP(0, 5, 1, 1);
+                        FLOPS(0, 6, 2, 1, complete_function, impulse);
                         surf_vel_mag_2 = sqrt(surf_vel_mag_2_sqrd);
                         surf_vel_precomp = u_s2 * deltaP_ball[1] / surf_vel_mag_2;
                         deltaP_axis_2[0] = surf_vel_precomp * surf_vel_2[0];
@@ -610,8 +591,7 @@ DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, f
                     deltaP_axis_2[0] = deltaP_axis_2[1] = 0;
                     deltaP_axis_2_C[0] = deltaP_axis_2_C[1] = 0;
                     if(surf_vel_mag_1_sqrd != 0.0) {
-                        FLOPS(0, 5, 1, 1, complete_function, loop);
-                        FLOPS_SINGLE_LOOP(0, 5, 1, 1);
+                        FLOPS(0, 5, 1, 1, complete_function, impulse);
                         surf_vel_mag_1 = sqrt(surf_vel_mag_1_sqrd);
                         surf_vel_precomp = u_s1 * deltaP_ball[1] / surf_vel_mag_1;
                         deltaP_axis_1[0] = surf_vel_precomp * surf_vel_1[0];
@@ -640,16 +620,18 @@ DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, f
             deltaP_axis_2_C[0] = deltaP_axis_2_C[1] = 0;
         }
 
-        FLOPS(10, 4, 0, 0, complete_function, loop);
-        FLOPS_SINGLE_LOOP(10, 4, 0, 0);
+        END_PROFILE(impulse);
+
+        START_PROFILE(delta);
+
+        FLOPS(10, 4, 0, 0, complete_function, delta);
         // Update velocities
         local_vel_1[0] += (deltaP_ball[0] + deltaP_axis_1[0]) * M_rep;
         local_vel_1[1] += (-deltaP + deltaP_axis_1[1]) * M_rep;
         local_vel_2[0] += (-deltaP_ball[0] + deltaP_axis_2[0]) * M_rep;
         local_vel_2[1] += (deltaP + deltaP_axis_2[1]) * M_rep;
 
-        FLOPS(8, 0, 0, 0, complete_function, loop);
-        FLOPS_SINGLE_LOOP(8, 0, 0, 0);
+        FLOPS(8, 0, 0, 0, complete_function, delta);
         // Update Angular Velocities
         local_ang_1[0] += (deltaP_ball_C[1] + deltaP_axis_1_C[1]);
         local_ang_1[1] -= deltaP_axis_1_C[0];
@@ -659,30 +641,30 @@ DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, f
         local_ang_2[1] -= deltaP_axis_2_C[0];
         local_ang_2[2] -= deltaP_ball_C[0];
 
-        FLOPS(4, 4, 0, 0, complete_function, loop);
-        FLOPS_SINGLE_LOOP(4, 4, 0, 0);
-        // Recalculate surface velocities using the updated arrays
+        FLOPS(0, 2, 0, 0, complete_function, delta);
         local_ang_1_0_R = R * local_ang_1[0];
         local_ang_2_0_R = R * local_ang_2[0];
+        END_PROFILE(delta);
+        START_PROFILE(velocity);
+
+        // Recalculate surface velocities using the updated arrays
+        FLOPS(4, 2, 0, 0, complete_function, velocity);
         surf_vel_1[0] = local_vel_1[0] + R * local_ang_1[1];
         surf_vel_1[1] = local_vel_1[1] - local_ang_1_0_R;
         surf_vel_2[0] = local_vel_2[0] + R * local_ang_2[1];
         surf_vel_2[1] = local_vel_2[1] - local_ang_2_0_R;
 
-        FLOPS(2, 4, 0, 0, complete_function, loop);
-        FLOPS_SINGLE_LOOP(2, 4, 0, 0);
+        FLOPS(2, 4, 0, 0, complete_function, velocity);
         surf_vel_mag_1_sqrd = surf_vel_1[0]*surf_vel_1[0] + surf_vel_1[1]*surf_vel_1[1];
         surf_vel_mag_2_sqrd = surf_vel_2[0]*surf_vel_2[0] + surf_vel_2[1]*surf_vel_2[1];
 
-        FLOPS(5, 2, 0, 0, complete_function, loop);
-        FLOPS_SINGLE_LOOP(5, 2, 0, 0);
+        FLOPS(5, 2, 0, 0, complete_function, velocity);
         // update ball-ball slip:
         contact_vel[0] = local_vel_1[0] - local_vel_2[0] - R * (local_ang_1[2] + local_ang_2[2]);
         contact_vel[1] = local_ang_1_0_R + local_ang_2_0_R;
         ball_ball_contact_mag_sqrd = contact_vel[0]*contact_vel[0] + contact_vel[1]*contact_vel[1];
 
-        FLOPS(3, 1, 0, 0, complete_function, loop);
-        FLOPS_SINGLE_LOOP(3, 1, 0, 0);
+        FLOPS(3, 1, 0, 0, complete_function, velocity);
         // Update work and check compression phase
         prev_diff = velocity_diff_y;
         velocity_diff_y = local_vel_2[1] - local_vel_1[1];
@@ -690,20 +672,13 @@ DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, f
 
         if (work_compression == 0 && velocity_diff_y > 0) {
             work_compression = total_work;
-            FLOPS(0, 1, 0, 0, complete_function, loop);
-            FLOPS_SINGLE_LOOP(0, 1, 0, 0);
+            FLOPS(0, 1, 0, 0, complete_function, velocity);
             work_required = e_b_sqrd_plus_1 * work_compression;
         }
 
-        #ifdef PROFILE
-            if(first_iter) {
-                first_iter = false;
-                END_PROFILE(single_loop_iteration);
-            }
-        #endif
+        END_PROFILE(velocity);
     }
 
-    END_PROFILE(loop);
     START_PROFILE(after_loop);
 
     // Transform back to global coordinates

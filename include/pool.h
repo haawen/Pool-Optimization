@@ -63,6 +63,7 @@ def collide_balls(
 
 
  typedef struct {
+     unsigned long long cycles_cumulative; // For profiles in a loop
      unsigned long long cycle_start;
      unsigned long long cycle_end;
      #ifdef _MSC_VER
@@ -70,6 +71,7 @@ def collide_balls(
      #else
          struct timespec start_ts, end_ts;
      #endif
+     unsigned long long ts_cumulative;
      long int flops; // W
      long int memory; // Q -> loads and stores
      long int ADDS;

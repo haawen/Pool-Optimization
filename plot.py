@@ -154,21 +154,22 @@ op_colors = {
     "MULS": "blue",
     "DIVS": "orange",
     "SQRT": "RED",
-    "Nanoseconds": "yellow",
+    "Nanoseconds": "black",
 }
 
 section_colors = {
     "Initialization": "green",
-    "Loop": "blue",
-    "Single Loop Iteration": "orange",
+    "Impulse": "blue",
+    "Delta": "orange",
+    "Velocity": "purple",
     "Transform to World Frame": "red",
-    "collide_balls": "yellow",
+    "collide_balls": "black",
 }
 
 
 def bar_plot_by_testcase(column, width=0.1):
     tc = list(df["Test Case"].unique())
-    sections = list(df["Section"].unique())
+    sections = section_colors.keys()
     x = np.arange(len(tc))
 
     for f, data in df.groupby("Function"):
@@ -215,12 +216,13 @@ for f, data in flops.groupby("Function"):
 
     x = np.arange(len(flops["Section"].value_counts()))
 
-    for i, section in enumerate(groups.index):
+    for i, section in enumerate(section_colors.keys()):
+        # for i, section in enumerate(groups.index):
         offset = 0
         for vi, v in enumerate(["ADDS", "MULS", "DIVS", "SQRT"]):
             rects = plt.bar(
                 x[i] + offset,
-                groups.values[i, vi],
+                groups.loc[section, v],
                 width=width,
                 label=v,
                 color=op_colors[v],
@@ -229,7 +231,7 @@ for f, data in flops.groupby("Function"):
             offset += width
 
     plt.xlabel("Section")
-    plt.xticks(x, groups.index)
+    plt.xticks(x, section_colors.keys())
     plt.yscale("log")  # Only set the Y-axis to log scale
     plt.ylabel("Operation Count")
     plt.title(f"Cost Evaluation for {f}")

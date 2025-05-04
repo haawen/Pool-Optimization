@@ -3,8 +3,8 @@
 #include <stdio.h>
 #include "unity.h"
 
-#define WARMUP 10000
-#define ITERATIONS 10000
+#define WARMUP 1000
+#define ITERATIONS 1000
 
 typedef struct {
     float R;          // Ball radius
@@ -173,7 +173,7 @@ void setUp(void) {
         }
     };
 
-    Profile profiles[5];
+    Profile profiles[6];
     double rvw1_result[9];
     double rvw2_result[9];
     for(int i = 0; i < WARMUP; i++) {
@@ -202,28 +202,7 @@ void tearDown(void) {}
 typedef void (*CollideBallsFn)(double*, double*, float, float, float, float, float, float, float, int, double*, double*, Profile*);
 
 void summarize_profile(Profile* profile, const char* func_name, const char* part_name, int test_case, int iteration, FILE* file) {
-
-    unsigned long long ns = 0;
-    #ifdef _MSC_VER
-            ns = (unsigned long long)(((profile->end_counter.QuadPart - profile->start_counter.QuadPart) * 1e9) / profile->freq.QuadPart);
-        #else
-            ns = (profile->end_ts.tv_sec - profile->start_ts.tv_sec) * 1000000000ULL + (profile->end_ts.tv_nsec - profile->start_ts.tv_nsec);
-        #endif
-
-    unsigned long long cycles = profile->cycle_end - profile->cycle_start;
-
-    /*
-   printf("\n=== %s Profile === \n", part_name);
-   printf("\t%-12s %llu\n", "Nanoseconds:", ns);
-   printf("\t%-12s %llu\n", "Cycles:", cycles);
-   int total_length = 4 + strlen(part_name) + 13;
-   for (int i = 0; i < total_length; i++) {
-       putchar('=');
-   }
-   printf("\n");
-   */
-
-    fprintf(file, "%s,%s,%d,%d,%llu,%llu\n", func_name, part_name, test_case, iteration, ns, cycles);
+    fprintf(file, "%s,%s,%d,%d,%llu,%llu\n", func_name, part_name, test_case, iteration, profile->ts_cumulative, profile->cycles_cumulative);
 }
 
 
@@ -235,7 +214,7 @@ void call_function(const char* name, CollideBallsFn collide_fn) {
             return;
         }
 
-        Profile profiles[5];
+        Profile profiles[6];
 
         for(int j = 0; j < ITERATIONS; j++) {
             for(int i = 0; i < TEST_CASES; i++) {
@@ -259,9 +238,10 @@ void call_function(const char* name, CollideBallsFn collide_fn) {
 
                 summarize_profile(&profiles[0], name, "collide_balls", i, j, csv);
                 summarize_profile(&profiles[1], name, "Initialization", i, j, csv);
-                summarize_profile(&profiles[2], name, "Loop", i, j, csv);
-                summarize_profile(&profiles[3], name, "Single Loop Iteration", i, j, csv);
-                summarize_profile(&profiles[4], name, "Transform to World Frame", i, j, csv);
+                summarize_profile(&profiles[2], name, "Impulse", i, j, csv);
+                summarize_profile(&profiles[3], name, "Delta", i, j, csv);
+                summarize_profile(&profiles[4], name, "Velocity", i, j, csv);
+                summarize_profile(&profiles[5], name, "Transform to World Frame", i, j, csv);
 
                 TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(tolerance, reference[i].ball1.velocity[0], rvw1_result[3], "Ball 1 Velocity X not within tolerance!");
                 TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(tolerance, reference[i].ball1.velocity[1], rvw1_result[4], "Ball 1 Velocity Y not within tolerance!");
