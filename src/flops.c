@@ -169,7 +169,7 @@ void setUp(void) {
     };
 }
 
-typedef void (*CollideBallsFn)(double*, double*, float, float, float, float, float, float, float, int, double*, double*, Profile*);
+typedef void (*CollideBallsFn)(double*, double*, float, float, float, float, float, float, float, int, double*, double*, Profile*, Branch*);
 
 void call_function(const char* name, CollideBallsFn collide_fn) {
 
@@ -180,6 +180,7 @@ void call_function(const char* name, CollideBallsFn collide_fn) {
     }
 
     Profile profiles[6];
+    Branch branches[10] = {0};
 
     for(int i = 0; i < TEST_CASES; i++) {
         double rvw1_result[9];
@@ -197,7 +198,8 @@ void call_function(const char* name, CollideBallsFn collide_fn) {
             reference[i].N,
             rvw1_result,
             rvw2_result,
-            profiles
+            profiles,
+            branches
         );
 
         fprintf(csv, "%s,%s,%d,%ld,%ld,%ld,%ld,%ld,%ld\n", name, "collide_balls", i, profiles[0].flops, profiles[0].memory * sizeof(double), profiles[0].ADDS, profiles[0].MULS, profiles[0].DIVS, profiles[0].SQRT);
@@ -206,6 +208,11 @@ void call_function(const char* name, CollideBallsFn collide_fn) {
         fprintf(csv, "%s,%s,%d,%ld,%ld,%ld,%ld,%ld,%ld\n", name, "Delta", i, profiles[3].flops, profiles[3].memory* sizeof(double), profiles[3].ADDS, profiles[3].MULS, profiles[3].DIVS, profiles[3].SQRT);
         fprintf(csv, "%s,%s,%d,%ld,%ld,%ld,%ld,%ld,%ld\n", name, "Velocity", i, profiles[4].flops, profiles[4].memory* sizeof(double), profiles[4].ADDS, profiles[4].MULS, profiles[4].DIVS, profiles[4].SQRT);
         fprintf(csv, "%s,%s,%d,%ld,%ld,%ld,%ld,%ld,%ld\n", name, "Transform to World Frame", i, profiles[5].flops, profiles[5].memory* sizeof(double), profiles[5].ADDS, profiles[5].MULS, profiles[5].DIVS, profiles[5].SQRT);
+
+        printf("=== BRANCH PREDICTION ANALYSIS %s TC %d === \n", name, i);
+        for(int b = 0; b < 10; b++) {
+            printf("Executed Branch %d %lu times.\n", b, branches[b].count);
+        }
     }
 
     fclose(csv);

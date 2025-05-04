@@ -190,7 +190,8 @@ void setUp(void) {
             reference[0].N,
             rvw1_result,
             rvw2_result,
-            profiles
+            profiles,
+            NULL
         );
     }
 
@@ -199,7 +200,7 @@ void tearDown(void) {}
 
 
 
-typedef void (*CollideBallsFn)(double*, double*, float, float, float, float, float, float, float, int, double*, double*, Profile*);
+typedef void (*CollideBallsFn)(double*, double*, float, float, float, float, float, float, float, int, double*, double*, Profile*, Branch*);
 
 void summarize_profile(Profile* profile, const char* func_name, const char* part_name, int test_case, int iteration, FILE* file) {
     fprintf(file, "%s,%s,%d,%d,%llu,%llu\n", func_name, part_name, test_case, iteration, profile->ts_cumulative, profile->cycles_cumulative);
@@ -233,7 +234,8 @@ void call_function(const char* name, CollideBallsFn collide_fn) {
                     reference[i].N,
                     rvw1_result,
                     rvw2_result,
-                    profiles
+                    profiles,
+                    NULL
                 );
 
                 summarize_profile(&profiles[0], name, "collide_balls", i, j, csv);

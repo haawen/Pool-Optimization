@@ -35,11 +35,13 @@
         } \
     } while(0)
 
+    #define BRANCH(i) branches[i].count++
+
 #else
 
 #define FLOPS(adds, muls, divs, sqrt, ...)
 #define MEMORY(count, ...)
-
+#define BRANCH(i)
 #endif
 
 
@@ -124,7 +126,7 @@ static inline void end_profiling_section(Profile* profile) {
 
 #endif
 
-DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double* rvw1_result, double* rvw2_result, Profile* profiles) {
+DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double* rvw1_result, double* rvw2_result, Profile* profiles, Branch* branches) {
 
     #ifdef PROFILE
         Profile* complete_function = &profiles[0];
@@ -255,6 +257,7 @@ DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, floa
 
         // Impulse Calculation
         if (ball_ball_contact_point_magnitude < 1e-16) {
+            BRANCH(0);
             deltaP_1 = 0;
             deltaP_2 = 0;
             deltaP_x_1 = 0;
@@ -262,39 +265,47 @@ DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, floa
             deltaP_x_2 = 0;
             deltaP_y_2 = 0;
         } else {
-
+            BRANCH(1);
             FLOPS(1, 2, 1, 0, complete_function, impulse);
             deltaP_1 = -u_b * deltaP * contact_point_velocity_x / ball_ball_contact_point_magnitude;
             if(fabs(contact_point_velocity_z) < 1e-16) {
+                BRANCH(2);
                 deltaP_2 = 0;
                 deltaP_x_1 = 0;
                 deltaP_y_1 = 0;
                 deltaP_x_2 = 0;
                 deltaP_y_2 = 0;
             } else {
+                BRANCH(3);
                 FLOPS(1, 2, 1, 0, complete_function, impulse);
                 deltaP_2 = -u_b * deltaP * contact_point_velocity_z / ball_ball_contact_point_magnitude;
 
                 if(deltaP_2 > 0) {
+                    BRANCH(4);
                     deltaP_x_1 = 0;
                     deltaP_y_1 = 0;
 
                     // TODO: probably best to check for some tolerance
                     if(surface_velocity_magnitude_2 == 0.0) {
+                        BRANCH(5);
                         deltaP_x_2 = 0;
                         deltaP_y_2 = 0;
                     } else {
+                        BRANCH(6);
                         FLOPS(2, 4, 2, 0, complete_function, impulse);
                         deltaP_x_2 = -u_s2 * (surface_velocity_x_2 / surface_velocity_magnitude_2) * deltaP_2;
                         deltaP_y_2 = -u_s2 * (surface_velocity_y_2 / surface_velocity_magnitude_2) * deltaP_2;
                     }
                 } else {
+                    BRANCH(7);
                     deltaP_x_2 = 0;
                     deltaP_y_2 = 0;
                     if(surface_velocity_magnitude_1 == 0.0) {
+                        BRANCH(8);
                         deltaP_x_1 = 0;
                         deltaP_y_1 = 0;
                     } else {
+                        BRANCH(9);
                         FLOPS(0, 4, 2, 0, complete_function, impulse);
                         deltaP_x_1 = u_s1 * (surface_velocity_x_1 / surface_velocity_magnitude_1) * deltaP_2;
                         deltaP_y_1 = u_s1 * (surface_velocity_y_1 / surface_velocity_magnitude_1) * deltaP_2;
@@ -401,7 +412,7 @@ DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, floa
 }
 
 
-DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double* rvw1_result, double* rvw2_result, Profile* profiles) {
+DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double* rvw1_result, double* rvw2_result, Profile* profiles, Branch* branches) {
 
     #ifdef PROFILE
         Profile* complete_function = &profiles[0];
@@ -560,7 +571,9 @@ DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, f
 
         // Impulse Calculation
         // TODO: I think in 99% of cases this will be true, maybe its faster to just skip this if and do it in the end
-        if (ball_ball_contact_mag_sqrd >= 1e-32) {
+        // if (ball_ball_contact_mag_sqrd >= 1e-32) { // Always executed
+            BRANCH(0);
+
             FLOPS(0, 3, 1, 1, complete_function, impulse);
             // TODO: Could be optimized by using reciprocal sqrt, but intrinsics only support floats
             ball_ball_contact_mag = sqrt(ball_ball_contact_mag_sqrd);
@@ -568,14 +581,17 @@ DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, f
             deltaP_ball[0] = delta_ball_precomp * contact_vel[0];
             deltaP_ball_C[0] = C * deltaP_ball[0];
 
-            if(fabs(contact_vel[1]) >= 1e-16) {
+            // if(fabs(contact_vel[1]) >= 1e-16) { // Executed every time
+                BRANCH(2);
                 FLOPS(0, 3, 1, 0, complete_function, impulse);
                 deltaP_ball[1] = delta_ball_precomp * contact_vel[1];
                 deltaP_ball_C[1] = C * deltaP_ball[1];
                 if(deltaP_ball[1] > 0) {
+                    BRANCH(4); // 50 % of executions
                     deltaP_axis_1[0] = deltaP_axis_1[1] = 0;
                     deltaP_axis_1_C[0] = deltaP_axis_1_C[1] = 0;
                     if(surf_vel_mag_2_sqrd != 0.0) {
+                        BRANCH(6);
                         FLOPS(0, 6, 2, 1, complete_function, impulse);
                         surf_vel_mag_2 = sqrt(surf_vel_mag_2_sqrd);
                         surf_vel_precomp = u_s2 * deltaP_ball[1] / surf_vel_mag_2;
@@ -584,13 +600,16 @@ DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, f
                         deltaP_axis_2_C[0] = C * deltaP_axis_2[0];
                         deltaP_axis_2_C[1] = C * deltaP_axis_2[1];
                     } else {
+                        BRANCH(7); // Executed Once or 0 times
                         deltaP_axis_2[0] = deltaP_axis_2[1] = 0;
                         deltaP_axis_2_C[0] = deltaP_axis_2_C[1] = 0;
                     }
                 } else {
+                    BRANCH(5); // 50 % of executions
                     deltaP_axis_2[0] = deltaP_axis_2[1] = 0;
                     deltaP_axis_2_C[0] = deltaP_axis_2_C[1] = 0;
                     if(surf_vel_mag_1_sqrd != 0.0) {
+                        BRANCH(8);
                         FLOPS(0, 5, 1, 1, complete_function, impulse);
                         surf_vel_mag_1 = sqrt(surf_vel_mag_1_sqrd);
                         surf_vel_precomp = u_s1 * deltaP_ball[1] / surf_vel_mag_1;
@@ -599,11 +618,13 @@ DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, f
                         deltaP_axis_1_C[0] = C * deltaP_axis_1[0];
                         deltaP_axis_1_C[1] = C * deltaP_axis_1[1];
                     } else {
+                        BRANCH(9);
                         deltaP_axis_1[0] = deltaP_axis_1[1] = 0;
                         deltaP_axis_1_C[0] = deltaP_axis_1_C[1] = 0;
                     }
                 }
-            } else {
+                /*  } else { // In all five testcases, not once executed
+                BRANCH(3);
                 deltaP_ball[1] = 0;
                 deltaP_ball_C[1] = 0;
                 deltaP_axis_1[0] = deltaP_axis_1[1] = 0;
@@ -611,14 +632,16 @@ DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, f
                 deltaP_axis_2[0] = deltaP_axis_2[1] = 0;
                 deltaP_axis_2_C[0] = deltaP_axis_2_C[1] = 0;
             }
-        } else {
+            */
+        /* } else { // Never executed
+            BRANCH(1);
             deltaP_ball[0] = deltaP_ball[1] = 0;
             deltaP_ball_C[0] = deltaP_ball_C[1] = 0;
             deltaP_axis_1[0] = deltaP_axis_1[1] = 0;
             deltaP_axis_1_C[0] = deltaP_axis_1_C[1] = 0;
             deltaP_axis_2[0] = deltaP_axis_2[1] = 0;
             deltaP_axis_2_C[0] = deltaP_axis_2_C[1] = 0;
-        }
+        } */
 
         END_PROFILE(impulse);
 
