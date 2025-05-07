@@ -73,7 +73,7 @@ for opi, op in enumerate(["ADDS", "MULS", "DIVS", "SQRT"]):
                 label=f"{f}",
                 color=color_styles[f],
             )
-            plt.bar_label(rects, padding=3)
+            plt.bar_label(rects, padding=3, rotation=45)
             offset += width
 
         multiplier += 1
@@ -134,7 +134,7 @@ def bar_plot_by_testcase(column, width=0.125, log=True, roundv=True):
                     label=section,
                     color=section_colors[section],
                 )
-                plt.bar_label(rects, padding=3)
+                plt.bar_label(rects, padding=3, rotation=45)
                 offset += width
 
         plt.xlabel("Testcase")
@@ -176,7 +176,7 @@ for f, data in flops.groupby("Function"):
                 label=v,
                 color=op_colors[v],
             )
-            plt.bar_label(rects, padding=3)
+            plt.bar_label(rects, padding=3, rotation=45)
             offset += width
 
     plt.xlabel("Section")
