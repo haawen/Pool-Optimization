@@ -19,7 +19,7 @@ df.columns = df.columns.str.strip()
 # Group by Function, Section, and Test Case
 grouped = (
     df.groupby(["Function", "Section", "Test Case"])[
-        ["Nanoseconds", "Cycles", "Flops", "Memory", "ADDS", "MULS", "DIVS", "SQRT"]
+        ["Cycles", "Flops", "Memory", "ADDS", "MULS", "DIVS", "SQRT"]
     ]
     .mean()
     .reset_index()
@@ -49,7 +49,7 @@ color_styles = {
     "SIMD": "orange",
 }
 
-for col in ["Nanoseconds", "Cycles", "Flops", "Memory"]:
+for col in ["Cycles", "Flops", "Memory"]:
     # Plotting with Y-axis in log scale and different line styles for each function
     plt.figure(figsize=(12, 6))
 
@@ -154,7 +154,6 @@ op_colors = {
     "MULS": "blue",
     "DIVS": "orange",
     "SQRT": "RED",
-    "Nanoseconds": "black",
 }
 
 section_colors = {
@@ -167,7 +166,7 @@ section_colors = {
 }
 
 
-def bar_plot_by_testcase(column, width=0.1):
+def bar_plot_by_testcase(column, width=0.125):
     tc = list(df["Test Case"].unique())
     sections = section_colors.keys()
     x = np.arange(len(tc))
@@ -175,7 +174,7 @@ def bar_plot_by_testcase(column, width=0.1):
     for f, data in df.groupby("Function"):
         groups = data.groupby(["Test Case", "Section"])[[column]].mean()
 
-        fig, ax = plt.subplots(figsize=(12, 6))
+        fig, ax = plt.subplots(figsize=(20, 6))
 
         for testcase in tc:
             offset = -len(sections) / 2 * width
@@ -204,7 +203,6 @@ def bar_plot_by_testcase(column, width=0.1):
         plt.savefig(f"plots/{column}_{f}.png")
 
 
-bar_plot_by_testcase("Nanoseconds")
 bar_plot_by_testcase("Cycles")
 
 for f, data in flops.groupby("Function"):

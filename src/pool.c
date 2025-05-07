@@ -72,12 +72,8 @@ double* get_angular_velocity(double* rvw) {
 }
 
 static inline void init_profiling_section(Profile* profile) {
-    #ifdef _MSC_VER
-        QueryPerformanceFrequency(&profile->freq);
-    #endif
     profile->cycle_start = 0;
     profile->cycles_cumulative = 0;
-    profile->ts_cumulative = 0;
     profile->flops = 0;
     profile->memory = 0;
     profile->ADDS = 0;
@@ -87,29 +83,11 @@ static inline void init_profiling_section(Profile* profile) {
 }
 
 static inline void start_profiling_section(Profile* profile) {
-    #ifdef _MSC_VER
-        QueryPerformanceCounter(&profile->start_counter);
-    #else
-        clock_gettime(CLOCK_MONOTONIC, &profile->start_ts);
-    #endif
-    profile->cycle_start = __rdtsc();
+    profile->cycle_start = start_tsc();
 }
 
 static inline void end_profiling_section(Profile* profile) {
-    #ifdef _MSC_VER
-        QueryPerformanceCounter(&profile->end_counter);
-    #else
-        clock_gettime(CLOCK_MONOTONIC, &profile->end_ts);
-    #endif
-
-    #ifdef _MSC_VER
-        profile->ts_cumulative += (unsigned long long)(((profile->end_counter.QuadPart - profile->start_counter.QuadPart) * 1e9) / profile->freq.QuadPart);
-    #else
-        profile->ts_cumulative += (profile->end_ts.tv_sec - profile->start_ts.tv_sec) * 1000000000ULL + (profile->end_ts.tv_nsec - profile->start_ts.tv_nsec);
-    #endif
-
-    profile->cycle_end = __rdtsc();
-    profile->cycles_cumulative += profile->cycle_end - profile->cycle_start;
+    profile->cycles_cumulative += stop_tsc(profile->cycle_start);
 }
 
 #ifdef PROFILE

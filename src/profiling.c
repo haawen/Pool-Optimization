@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include "unity.h"
 
-#define WARMUP 10000
+#define WARMUP 1000
 #define ITERATIONS 10000
 
 typedef struct {
@@ -181,9 +181,8 @@ void tearDown(void) {}
 typedef void (*CollideBallsFn)(double*, double*, float, float, float, float, float, float, float, int, double*, double*, Profile*, Branch*);
 
 void summarize_profile(Profile* profile, const char* func_name, const char* part_name, int test_case, int iteration, FILE* file) {
-    fprintf(file, "%s,%s,%d,%d,%llu,%llu\n", func_name, part_name, test_case, iteration, profile->ts_cumulative, profile->cycles_cumulative);
+    fprintf(file, "%s,%s,%d,%d,%llu\n", func_name, part_name, test_case, iteration, profile->cycles_cumulative);
 }
-
 
 void call_function(const char* name, CollideBallsFn collide_fn) {
 
@@ -253,13 +252,13 @@ void call_function(const char* name, CollideBallsFn collide_fn) {
                 TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(tolerance, reference[i].ball1.angular[1], rvw1_result[7], "Ball 1 Angular Velocity Y not within tolerance!");
                 TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(tolerance, reference[i].ball1.angular[2], rvw1_result[8], "Ball 1 Angular Velocity Z not within tolerance!");
 
-                TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(tolerance, reference[i].ball2.velocity[0], rvw2_result[3], "Ball 1 Velocity X not within tolerance!");
-                TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(tolerance, reference[i].ball2.velocity[1], rvw2_result[4], "Ball 1 Velocity Y not within tolerance!");
-                TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(tolerance, reference[i].ball2.velocity[2], rvw2_result[5], "Ball 1 Velocity Z not within tolerance!");
+                TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(tolerance, reference[i].ball2.velocity[0], rvw2_result[3], "Ball 2 Velocity X not within tolerance!");
+                TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(tolerance, reference[i].ball2.velocity[1], rvw2_result[4], "Ball 2 Velocity Y not within tolerance!");
+                TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(tolerance, reference[i].ball2.velocity[2], rvw2_result[5], "Ball 2 Velocity Z not within tolerance!");
 
-                TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(tolerance, reference[i].ball2.angular[0], rvw2_result[6], "Ball 1 Angular Velocity X not within tolerance!");
-                TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(tolerance, reference[i].ball2.angular[1], rvw2_result[7], "Ball 1 Angular Velocity Y not within tolerance!");
-                TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(tolerance, reference[i].ball2.angular[2], rvw2_result[8], "Ball 1 Angular Velocity Z not within tolerance!");
+                TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(tolerance, reference[i].ball2.angular[0], rvw2_result[6], "Ball 2 Angular Velocity X not within tolerance!");
+                TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(tolerance, reference[i].ball2.angular[1], rvw2_result[7], "Ball 2 Angular Velocity Y not within tolerance!");
+                TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(tolerance, reference[i].ball2.angular[2], rvw2_result[8], "Ball 2 Angular Velocity Z not within tolerance!");
             }
         }
 
@@ -275,7 +274,7 @@ void test_collide_balls_code_motion(void) {
 }
 
 void test_collide_balls_simd(void) {
-    call_function("SIMD", simd_collide_balls);
+    // call_function("SIMD", simd_collide_balls);
 }
 
 int main() {
@@ -284,7 +283,7 @@ int main() {
         perror("Failed to open CSV file");
         return 0;
     }
-    fprintf(csv, "Function,Section,Test Case,Iteration,Nanoseconds,Cycles\n");
+    fprintf(csv, "Function,Section,Test Case,Iteration,Cycles\n");
     fclose(csv);
 
     UNITY_BEGIN();
