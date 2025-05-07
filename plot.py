@@ -13,6 +13,7 @@ df = pd.read_csv("build/profiling.csv")
 
 df = pd.merge(flops, df, on=["Function", "Section", "Test Case"])
 df["Test Case"] = "TC " + df["Test Case"].astype(str)
+df["FlopsPerCycle"] = df["Flops"] / df["Cycles"]
 
 df.columns = df.columns.str.strip()
 
@@ -48,61 +49,6 @@ color_styles = {
     "Code Motion": "green",
     "SIMD": "orange",
 }
-
-for col in ["Cycles", "Flops", "Memory"]:
-    # Plotting with Y-axis in log scale and different line styles for each function
-    plt.figure(figsize=(12, 6))
-
-    for label, group_data in grouped.groupby("Group"):
-        function_name = group_data["Function"].iloc[
-            0
-        ]  # Get the function name for the current group
-        line_style = line_styles.get(function_name, "-")
-        marker_style = marker_styles.get(function_name, "o")
-        plt.plot(
-            group_data["Test Case"],
-            group_data[col],
-            marker=marker_style,
-            label=label,
-            linestyle=line_style,
-        )
-
-    plt.yscale("log")  # Only set the Y-axis to log scale
-    plt.xlabel("Test Case")
-    plt.ylabel(f"Average {col} (log scale)")
-    plt.title(f"Profiling {col}")
-    plt.legend(title="Function | Section", bbox_to_anchor=(1.05, 1), loc="upper left")
-    plt.tight_layout()
-
-    plt.savefig(f"plots/{col}.png")
-
-## FLops per seconds
-
-plt.figure(figsize=(12, 6))
-
-for label, group_data in grouped.groupby("Group"):
-    function_name = group_data["Function"].iloc[
-        0
-    ]  # Get the function name for the current group
-    line_style = line_styles.get(function_name, "-")
-    marker_style = marker_styles.get(function_name, "o")
-
-    plt.plot(
-        group_data["Test Case"],
-        group_data["Flops"] / (group_data["Cycles"]),
-        marker=marker_style,
-        label=label,
-        linestyle=line_style,
-    )
-
-plt.xlabel("Test Case")
-plt.ylabel("Average flops per cycle (log scale)")
-plt.title("Profiling Flops Per Cycle")
-plt.legend(title="Function | Section", bbox_to_anchor=(1.05, 1), loc="upper left")
-plt.tight_layout()
-
-plt.savefig("plots/FlopsPerCycle.png")
-
 
 ## Cost
 for opi, op in enumerate(["ADDS", "MULS", "DIVS", "SQRT"]):
@@ -166,7 +112,7 @@ section_colors = {
 }
 
 
-def bar_plot_by_testcase(column, width=0.125):
+def bar_plot_by_testcase(column, width=0.125, log=True, roundv=True):
     tc = list(df["Test Case"].unique())
     sections = section_colors.keys()
     x = np.arange(len(tc))
@@ -181,7 +127,9 @@ def bar_plot_by_testcase(column, width=0.125):
             for section in sections:
                 rects = plt.bar(
                     x[tc.index(testcase)] + offset,
-                    round(groups.loc[(testcase, section), column]),
+                    round(groups.loc[(testcase, section), column])
+                    if roundv
+                    else groups.loc[(testcase, section), column],
                     width=width,
                     label=section,
                     color=section_colors[section],
@@ -191,7 +139,8 @@ def bar_plot_by_testcase(column, width=0.125):
 
         plt.xlabel("Testcase")
         plt.xticks(x, tc)
-        plt.yscale("log")  # Only set the Y-axis to log scale
+        if log:
+            plt.yscale("log")  # Only set the Y-axis to log scale
         plt.ylabel(column)
 
         handles, labels = ax.get_legend_handles_labels()
@@ -204,6 +153,8 @@ def bar_plot_by_testcase(column, width=0.125):
 
 
 bar_plot_by_testcase("Cycles")
+bar_plot_by_testcase("FlopsPerCycle", log=False, roundv=False)
+
 
 for f, data in flops.groupby("Function"):
     groups = data.groupby(["Section"])[["ADDS", "MULS", "DIVS", "SQRT"]].mean()
