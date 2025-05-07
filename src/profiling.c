@@ -173,28 +173,6 @@ void setUp(void) {
         }
     };
 
-    Profile profiles[6];
-    double rvw1_result[9];
-    double rvw2_result[9];
-    for(int i = 0; i < WARMUP; i++) {
-        collide_balls(
-            reference[0].rvw1,
-            reference[0].rvw2,
-            reference[0].R,
-            reference[0].M,
-            reference[0].u_s1,
-            reference[0].u_s2,
-            reference[0].u_b,
-            reference[0].e_b,
-            0.0f,           // deltaP
-            reference[0].N,
-            rvw1_result,
-            rvw2_result,
-            profiles,
-            NULL
-        );
-    }
-
 }
 void tearDown(void) {}
 
@@ -213,6 +191,28 @@ void call_function(const char* name, CollideBallsFn collide_fn) {
         if (csv == NULL) {
             perror("Failed to open CSV file");
             return;
+        }
+
+        Profile warmup_profiles[6];
+        double rvw1_result[9];
+        double rvw2_result[9];
+        for(int i = 0; i < WARMUP; i++) {
+            collide_fn(
+                reference[0].rvw1,
+                reference[0].rvw2,
+                reference[0].R,
+                reference[0].M,
+                reference[0].u_s1,
+                reference[0].u_s2,
+                reference[0].u_b,
+                reference[0].e_b,
+                0.0f,           // deltaP
+                reference[0].N,
+                rvw1_result,
+                rvw2_result,
+                warmup_profiles,
+                NULL
+            );
         }
 
         Profile profiles[6];
@@ -274,6 +274,10 @@ void test_collide_balls_code_motion(void) {
     call_function("Code Motion", code_motion_collide_balls);
 }
 
+void test_collide_balls_simd(void) {
+    call_function("SIMD", simd_collide_balls);
+}
+
 int main() {
     FILE* csv = fopen("profiling.csv", "w");
     if (csv == NULL) {
@@ -286,6 +290,7 @@ int main() {
     UNITY_BEGIN();
         RUN_TEST(test_collide_balls_basic);
         RUN_TEST(test_collide_balls_code_motion);
+        RUN_TEST(test_collide_balls_simd);
     int result = UNITY_END();
 
     printf("\n=== Now Run python plot.py to visualize profiling results. ==\n");

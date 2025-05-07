@@ -231,6 +231,7 @@ int main() {
 
     call_function("Basic Implementation", collide_balls);
     call_function("Code Motion", code_motion_collide_balls);
+    call_function("SIMD", simd_collide_balls);
 
     return 0;
 }

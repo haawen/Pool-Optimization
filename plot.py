@@ -31,14 +31,14 @@ line_styles = {
     "Default": "-",
     "Basic Implementation": "--",
     "Code Motion": "-.",
-    "RSQRT": ":",
+    "SIMD": ":",
 }
 
 marker_styles = {
     "Default": "o",
     "Basic Implementation": "^",
     "Code Motion": "s",
-    "RSQRT": "x",
+    "SIMD": "x",
 }
 
 
@@ -46,7 +46,7 @@ color_styles = {
     "Default": "o",
     "Basic Implementation": "blue",
     "Code Motion": "green",
-    "RSQRT": "orange",
+    "SIMD": "orange",
 }
 
 for col in ["Nanoseconds", "Cycles", "Flops", "Memory"]:
