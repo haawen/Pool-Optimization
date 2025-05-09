@@ -71,16 +71,7 @@ double* get_angular_velocity(double* rvw) {
     return &rvw[6];
 }
 
-static inline void init_profiling_section(Profile* profile) {
-    profile->cycle_start = 0;
-    profile->cycles_cumulative = 0;
-    profile->flops = 0;
-    profile->memory = 0;
-    profile->ADDS = 0;
-    profile->MULS = 0;
-    profile->DIVS = 0;
-    profile->SQRT = 0;
-}
+static inline void init_profiling_section(Profile* profile);
 
 static inline void start_profiling_section(Profile* profile) {
     profile->cycle_start = start_tsc();

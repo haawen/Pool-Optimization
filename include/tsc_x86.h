@@ -16,6 +16,7 @@
 
 /* ======================== WIN32 ======================= */
 #else
+#include <intrin.h>
 
 	#define myInt64 signed __int64
 	#define INT32 unsigned __int32
@@ -54,22 +55,22 @@
 /* ======================== WIN32 ======================= */
 #else
 
-	typedef union
-	{       myInt64 int64;
-			struct {INT32 lo, hi;} int32;
-	} tsc_counter;
 
-	#define RDTSC(cpu_c)   \
-	{       __asm rdtsc    \
-			__asm mov (cpu_c).int32.lo,eax  \
-			__asm mov (cpu_c).int32.hi,edx  \
-	}
+typedef union {
+    unsigned __int64 int64;
+    struct { unsigned int lo, hi; } int32;
+} tsc_counter;
 
-	#define CPUID() \
-	{ \
-		__asm mov eax, 0 \
-		__asm cpuid \
-	}
+#define RDTSC(cpu_c) \
+    { \
+        cpu_c.int64 = __rdtsc(); \
+    }
+
+#define CPUID() \
+    { \
+        int cpuInfo[4]; \
+        __cpuid(cpuInfo, 0); \
+    }
 
 #endif
 

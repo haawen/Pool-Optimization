@@ -54,5 +54,15 @@ double* get_velocity(double* rvw);
 /* Assuming rvw is row-major (passed from pooltool) */
 double* get_angular_velocity(double* rvw);
 
+static inline void init_profiling_section(Profile* profile) {
+    profile->cycle_start = 0;
+    profile->cycles_cumulative = 0;
+    profile->flops = 0;
+    profile->memory = 0;
+    profile->ADDS = 0;
+    profile->MULS = 0;
+    profile->DIVS = 0;
+    profile->SQRT = 0;
+}
 
 #endif

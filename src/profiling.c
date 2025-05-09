@@ -2,9 +2,11 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include "unity.h"
+#include <stdlib.h>
 
-#define WARMUP 1000
-#define ITERATIONS 10000
+#define WARMUP 100
+#define ITERATIONS 1000
+#define FLUSH_SIZE (32 * 1024 * 1024)  // 32MB buffer
 
 typedef struct {
     float R;          // Ball radius
@@ -184,6 +186,20 @@ void summarize_profile(Profile* profile, const char* func_name, const char* part
     fprintf(file, "%s,%s,%d,%d,%llu\n", func_name, part_name, test_case, iteration, profile->cycles_cumulative);
 }
 
+void flush_cache(void) {
+    volatile char *buf = (volatile char*)malloc(FLUSH_SIZE);
+    if (buf == NULL) {
+        return;
+    }
+    for (size_t i = 0; i < FLUSH_SIZE; i++) {
+        buf[i] = (char)i;  // Write data to each location
+    }
+    for (size_t i = 0; i < FLUSH_SIZE; i++) {
+        (void)buf[i];      // Read back the data
+    }
+    free((void*)buf);
+}
+
 void call_function(const char* name, CollideBallsFn collide_fn) {
 
         FILE* csv = fopen("profiling.csv", "a");
@@ -217,9 +233,13 @@ void call_function(const char* name, CollideBallsFn collide_fn) {
         Profile profiles[6];
 
         for(int j = 0; j < ITERATIONS; j++) {
+            flush_cache(); // Flush the cache before each iteration
             for(int i = 0; i < TEST_CASES; i++) {
                 double rvw1_result[9];
                 double rvw2_result[9];
+                for (int p = 0; p < 6; p++) {
+                    init_profiling_section(&profiles[p]);
+                }
                 collide_fn(
                     reference[i].rvw1,
                     reference[i].rvw2,
@@ -278,6 +298,10 @@ void test_collide_balls_simd(void) {
 }
 
 int main() {
+    #ifdef _WIN32
+    // Pin to first processor
+    SetProcessAffinityMask(GetCurrentProcess(), 1);
+    #endif
     FILE* csv = fopen("profiling.csv", "w");
     if (csv == NULL) {
         perror("Failed to open CSV file");
@@ -289,7 +313,7 @@ int main() {
     UNITY_BEGIN();
         RUN_TEST(test_collide_balls_basic);
         RUN_TEST(test_collide_balls_code_motion);
-        RUN_TEST(test_collide_balls_simd);
+       // RUN_TEST(test_collide_balls_simd);
     int result = UNITY_END();
 
     printf("\n=== Now Run python plot.py to visualize profiling results. ==\n");
