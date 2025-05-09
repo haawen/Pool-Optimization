@@ -40,6 +40,7 @@ DLL_EXPORT void hello_world(const char* matrix_name, double* rvw);
  } Branch;
 
 DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double* rvw1_result, double* rvw2_result, Profile* profiles, Branch* branches);
+DLL_EXPORT void less_sqrt_collide_balls(double* rvw1, double* rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double* rvw1_result, double* rvw2_result, Profile* profiles, Branch* branches);
 
 DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double* rvw1_result, double* rvw2_result, Profile* profiles, Branch* branches);
 
@@ -54,15 +55,5 @@ double* get_velocity(double* rvw);
 /* Assuming rvw is row-major (passed from pooltool) */
 double* get_angular_velocity(double* rvw);
 
-static inline void init_profiling_section(Profile* profile) {
-    profile->cycle_start = 0;
-    profile->cycles_cumulative = 0;
-    profile->flops = 0;
-    profile->memory = 0;
-    profile->ADDS = 0;
-    profile->MULS = 0;
-    profile->DIVS = 0;
-    profile->SQRT = 0;
-}
-
+void init_profiling_section(Profile* profile);
 #endif

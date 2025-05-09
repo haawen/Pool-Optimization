@@ -289,6 +289,10 @@ void test_collide_balls_basic(void) {
     call_function("Basic Implementation", collide_balls);
 }
 
+void test_less_sqrt(void) {
+    call_function("Less SQRT", less_sqrt_collide_balls);
+}
+
 void test_collide_balls_code_motion(void) {
     call_function("Code Motion", code_motion_collide_balls);
 }
@@ -312,6 +316,7 @@ int main() {
 
     UNITY_BEGIN();
         RUN_TEST(test_collide_balls_basic);
+        RUN_TEST(test_less_sqrt);
         RUN_TEST(test_collide_balls_code_motion);
        // RUN_TEST(test_collide_balls_simd);
     int result = UNITY_END();

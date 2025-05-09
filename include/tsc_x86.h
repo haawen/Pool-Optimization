@@ -55,7 +55,6 @@
 /* ======================== WIN32 ======================= */
 #else
 
-
 typedef union {
     unsigned __int64 int64;
     struct { unsigned int lo, hi; } int32;

@@ -185,6 +185,11 @@ void call_function(const char* name, CollideBallsFn collide_fn) {
     for(int i = 0; i < TEST_CASES; i++) {
         double rvw1_result[9];
         double rvw2_result[9];
+
+        for (int p = 0; p < 6; p++) {
+            init_profiling_section(&profiles[p]);
+        }
+
         collide_fn(
             reference[i].rvw1,
             reference[i].rvw2,
@@ -230,6 +235,7 @@ int main() {
     setUp();
 
     call_function("Basic Implementation", collide_balls);
+    call_function("Less SQRT", less_sqrt_collide_balls);
     call_function("Code Motion", code_motion_collide_balls);
     call_function("SIMD", simd_collide_balls);
 

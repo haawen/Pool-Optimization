@@ -28,17 +28,12 @@ grouped = (
 grouped["Group"] = grouped["Function"] + " | " + grouped["Section"]
 
 # Define line styles for each Function
-line_styles = {
-    "Default": "-",
-    "Basic Implementation": "--",
-    "Code Motion": "-.",
-    "SIMD": ":",
-}
 
 marker_styles = {
     "Default": "o",
     "Basic Implementation": "^",
     "Code Motion": "s",
+    "Less SQRT": "m",
     "SIMD": "x",
 }
 
@@ -47,6 +42,7 @@ color_styles = {
     "Default": "o",
     "Basic Implementation": "blue",
     "Code Motion": "green",
+    "Less SQRT": "purple",
     "SIMD": "orange",
 }
 
