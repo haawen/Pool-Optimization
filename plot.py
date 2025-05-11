@@ -38,6 +38,7 @@ marker_styles = {
     "Basic Implementation": "^",
     "Code Motion": "s",
     "Less SQRT": "m",
+    "Branch Pred": "m",
     "SIMD": "x",
 }
 
@@ -47,6 +48,8 @@ color_styles = {
     "Basic Implementation": "blue",
     "Code Motion": "green",
     "Less SQRT": "purple",
+    "Branch Pred": "grey",
+    "Removed Unused Branches": "black",
     "SIMD": "orange",
 }
 
