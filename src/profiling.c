@@ -8,6 +8,12 @@
 #define ITERATIONS 1000
 #define FLUSH_SIZE (32 * 1024 * 1024)  // 32MB buffer
 
+#ifdef PROFILE
+const char* file_name = "profiling.csv";
+#else
+const char* file_name = "benchmark.csv";
+#endif
+
 typedef struct {
     float R;          // Ball radius
     float M;          // Ball mass
@@ -202,7 +208,7 @@ void flush_cache(void) {
 
 void call_function(const char* name, CollideBallsFn collide_fn) {
 
-        FILE* csv = fopen("profiling.csv", "a");
+        FILE* csv = fopen(file_name, "a");
         if (csv == NULL) {
             perror("Failed to open CSV file");
             return;
@@ -240,6 +246,11 @@ void call_function(const char* name, CollideBallsFn collide_fn) {
                 for (int p = 0; p < 6; p++) {
                     init_profiling_section(&profiles[p]);
                 }
+
+                #ifndef PROFILE
+                myInt64 start = start_tsc();
+                #endif
+
                 collide_fn(
                     reference[i].rvw1,
                     reference[i].rvw2,
@@ -257,12 +268,18 @@ void call_function(const char* name, CollideBallsFn collide_fn) {
                     NULL
                 );
 
-                summarize_profile(&profiles[0], name, "collide_balls", i, j, csv);
-                summarize_profile(&profiles[1], name, "Initialization", i, j, csv);
-                summarize_profile(&profiles[2], name, "Impulse", i, j, csv);
-                summarize_profile(&profiles[3], name, "Delta", i, j, csv);
-                summarize_profile(&profiles[4], name, "Velocity", i, j, csv);
-                summarize_profile(&profiles[5], name, "Transform to World Frame", i, j, csv);
+                #ifdef PROFILE
+                    summarize_profile(&profiles[0], name, "collide_balls", i, j, csv);
+                    summarize_profile(&profiles[1], name, "Initialization", i, j, csv);
+                    summarize_profile(&profiles[2], name, "Impulse", i, j, csv);
+                    summarize_profile(&profiles[3], name, "Delta", i, j, csv);
+                    summarize_profile(&profiles[4], name, "Velocity", i, j, csv);
+                    summarize_profile(&profiles[5], name, "Transform to World Frame", i, j, csv);
+                #else
+                    myInt64 cycles = stop_tsc(start);
+                    fprintf(csv, "%s,%d,%d,%llu\n", name, i, j, cycles);
+                #endif
+
 
                 TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(tolerance, reference[i].ball1.velocity[0], rvw1_result[3], "Ball 1 Velocity X not within tolerance!");
                 TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(tolerance, reference[i].ball1.velocity[1], rvw1_result[4], "Ball 1 Velocity Y not within tolerance!");
@@ -306,12 +323,17 @@ int main() {
     // Pin to first processor
     SetProcessAffinityMask(GetCurrentProcess(), 1);
     #endif
-    FILE* csv = fopen("profiling.csv", "w");
+
+    FILE* csv = fopen(file_name, "w");
     if (csv == NULL) {
         perror("Failed to open CSV file");
         return 0;
     }
+    #ifdef PROFILE
     fprintf(csv, "Function,Section,Test Case,Iteration,Cycles\n");
+    #else
+    fprintf(csv, "Function,Test Case,Iteration,Cycles\n");
+    #endif
     fclose(csv);
 
     UNITY_BEGIN();

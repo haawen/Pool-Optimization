@@ -17,6 +17,10 @@ df["FlopsPerCycle"] = df["Flops"] / df["Cycles"]
 
 df.columns = df.columns.str.strip()
 
+benchmark = pd.read_csv("build/benchmark.csv")
+benchmark["Test Case"] = "TC " + benchmark["Test Case"].astype(str)
+benchmark.columns = benchmark.columns.str.strip()
+
 # Group by Function, Section, and Test Case
 grouped = (
     df.groupby(["Function", "Section", "Test Case"])[
@@ -45,6 +49,44 @@ color_styles = {
     "Less SQRT": "purple",
     "SIMD": "orange",
 }
+
+
+fig, ax = plt.subplots(figsize=(12, 6))  # ✅ This gives both fig and ax
+x = np.arange(len(benchmark["Test Case"].value_counts()))
+cols = []
+for i, (tc, group) in enumerate(benchmark.groupby("Test Case")):
+    sub = group.groupby("Function")[["Cycles"]].mean()
+    functions = len(sub.index)
+    width = 0.1
+    cols.append(tc)
+
+    offset = -functions / 2 * width
+    for f in sub.index:
+        cycles = sub.loc[f, "Cycles"]
+
+        rects = plt.bar(
+            x[i] + offset,
+            cycles,
+            width,
+            label=f"{f}",
+            color=color_styles[f],
+        )
+
+        plt.bar_label(rects, padding=3, rotation=45)
+        offset += width
+
+handles, labels = ax.get_legend_handles_labels()
+by_label = dict(zip(labels, handles))
+ax.legend(by_label.values(), by_label.keys(), title="Function")
+
+plt.xlabel("")
+plt.xticks(x, cols)
+# plt.yscale("log")  # Only set the Y-axis to log scale
+plt.ylabel(f"Cycles")
+plt.title(f"Cycles Benchmark")
+
+plt.savefig(f"plots/benchmark.png")
+
 
 ## Cost
 for opi, op in enumerate(["ADDS", "MULS", "DIVS", "SQRT"]):
