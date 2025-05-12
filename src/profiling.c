@@ -5,7 +5,7 @@
 #include <stdlib.h>
 
 #define WARMUP 100
-#define ITERATIONS 1000
+#define ITERATIONS 10000
 #define FLUSH_SIZE (32 * 1024 * 1024)  // 32MB buffer
 
 #ifdef PROFILE
@@ -237,9 +237,9 @@ void call_function(const char* name, CollideBallsFn collide_fn) {
         }
 
         Profile profiles[6];
-        //flush_cache(); // Flush the cache before each iteration
+        flush_cache(); // Flush the cache before each iteration
         for(int j = 0; j < ITERATIONS; j++) {
-            flush_cache(); // Flush the cache before each iteration
+            // flush_cache(); // Flush the cache before each iteration
             for(int i = 0; i < TEST_CASES; i++) {
                 double rvw1_result[9];
                 double rvw2_result[9];
@@ -306,6 +306,10 @@ void test_collide_balls_basic(void) {
     call_function("Basic Implementation", collide_balls);
 }
 
+void test_precomp(void) {
+    call_function("Precompute", simple_precompute_cb);
+}
+
 void test_less_sqrt(void) {
     call_function("Less SQRT", less_sqrt_collide_balls);
 }
@@ -347,6 +351,7 @@ int main() {
     UNITY_BEGIN();
         RUN_TEST(test_collide_balls_basic);
         RUN_TEST(test_less_sqrt);
+        RUN_TEST(test_precomp);
         RUN_TEST(test_branch_prediction);
         RUN_TEST(test_remove_unused_branches);
         RUN_TEST(test_collide_balls_code_motion);

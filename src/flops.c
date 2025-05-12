@@ -180,7 +180,7 @@ void call_function(const char* name, CollideBallsFn collide_fn) {
     }
 
     Profile profiles[6];
-    Branch branches[10] = {0};
+    Branch branches[11] = {0};
 
     for(int i = 0; i < TEST_CASES; i++) {
         double rvw1_result[9];
@@ -215,7 +215,7 @@ void call_function(const char* name, CollideBallsFn collide_fn) {
         fprintf(csv, "%s,%s,%d,%ld,%ld,%ld,%ld,%ld,%ld\n", name, "Transform to World Frame", i, profiles[5].flops, profiles[5].memory* sizeof(double), profiles[5].ADDS, profiles[5].MULS, profiles[5].DIVS, profiles[5].SQRT);
 
         printf("=== BRANCH PREDICTION ANALYSIS %s TC %d === \n", name, i);
-        for(int b = 0; b < 10; b++) {
+        for(int b = 0; b < 11; b++) {
             printf("Executed Branch %d %lu times.\n", b, branches[b].count);
         }
     }
@@ -236,6 +236,7 @@ int main() {
 
     call_function("Basic Implementation", collide_balls);
     call_function("Less SQRT", less_sqrt_collide_balls);
+    call_function("Precompute", simple_precompute_cb);
     call_function("Branch Pred", branch_prediction_collide_balls);
     call_function("Removed Unused Branches", remove_unused_branches);
     call_function("Code Motion", code_motion_collide_balls);

@@ -31,42 +31,38 @@ grouped = (
 )
 grouped["Group"] = grouped["Function"] + " | " + grouped["Section"]
 
-# Define line styles for each Function
-
-marker_styles = {
-    "Default": "o",
-    "Basic Implementation": "^",
-    "Code Motion": "s",
-    "Less SQRT": "m",
-    "Branch Pred": "m",
-    "SIMD": "x",
-}
-
-
+# dont put dark colors
 color_styles = {
     "Default": "o",
     "Basic Implementation": "blue",
     "Code Motion": "green",
     "Less SQRT": "purple",
     "Branch Pred": "grey",
-    "Removed Unused Branches": "black",
+    "Removed Unused Branches": "#aec6cf",
     "SIMD": "orange",
+    "Precompute": "gold",
 }
-
 
 fig, ax = plt.subplots(figsize=(12, 6))  # ✅ This gives both fig and ax
 x = np.arange(len(benchmark["Test Case"].value_counts()))
 cols = []
+ranking = {}
 for i, (tc, group) in enumerate(benchmark.groupby("Test Case")):
     sub = group.groupby("Function")[["Cycles"]].mean()
+    sub = sub.sort_values("Cycles", ascending=False)  # Sort by cycles descending
     functions = len(sub.index)
     width = 0.1
     cols.append(tc)
 
     offset = -functions / 2 * width
+    r = 1
     for f in sub.index:
-        cycles = sub.loc[f, "Cycles"]
+        if f not in ranking:
+            ranking[f] = []
+        ranking[f].append(r)
+        r += 1
 
+        cycles = sub.loc[f, "Cycles"]
         rects = plt.bar(
             x[i] + offset,
             cycles,
@@ -80,15 +76,35 @@ for i, (tc, group) in enumerate(benchmark.groupby("Test Case")):
 
 handles, labels = ax.get_legend_handles_labels()
 by_label = dict(zip(labels, handles))
-ax.legend(by_label.values(), by_label.keys(), title="Function")
+num_funcs = len(benchmark["Function"].unique())
+
+# Compute mean ranks and reverse rank (so lower rank = higher value)
+ranked_items = [
+    (key, (num_funcs + 1 - np.mean(ranking[key])), by_label[key]) for key in by_label
+]
+
+# Sort by computed mean rank descending
+ranked_items.sort(key=lambda x: x[1], reverse=True)
+
+# Unpack sorted handles and labels
+sorted_labels = [f"{rank:.2f} - {key}" for key, rank, _ in ranked_items]
+sorted_handles = [handle for _, _, handle in ranked_items]
+
+# Assign to legend
+ax.legend(sorted_handles, sorted_labels, title="Mean Rank - Function")
+
+# print(by_label.keys())
 
 plt.xlabel("")
 plt.xticks(x, cols)
-# plt.yscale("log")  # Only set the Y-axis to log scale
+plt.yscale("log")  # Only set the Y-axis to log scale
 plt.ylabel(f"Cycles")
 plt.title(f"Cycles Benchmark")
 
 plt.savefig(f"plots/benchmark.png")
+plt.close()
+
+exit(0)
 
 
 ## Cost
@@ -132,6 +148,7 @@ for opi, op in enumerate(["ADDS", "MULS", "DIVS", "SQRT"]):
     plt.tight_layout()
 
     plt.savefig(f"plots/Cost{op}.png")
+    plt.close()
 
 
 # Cost per func
@@ -191,6 +208,7 @@ def bar_plot_by_testcase(column, width=0.125, log=True, roundv=True):
         plt.tight_layout()
 
         plt.savefig(f"plots/{column}_{f}.png")
+        plt.close()
 
 
 bar_plot_by_testcase("Cycles")
@@ -233,6 +251,7 @@ for f, data in flops.groupby("Function"):
     plt.tight_layout()
 
     plt.savefig(f"plots/Cost_{f}.png")
+    plt.close()
 
 
 # TODO: calcualte peak performance based on COST values and operations / ports, then plot
@@ -282,3 +301,4 @@ plt.grid(True, which="both", linestyle="--", linewidth=0.5)
 plt.legend()
 plt.tight_layout()
 plt.savefig("plots/roofline.png")
+plt.close()
