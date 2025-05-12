@@ -237,9 +237,9 @@ void call_function(const char* name, CollideBallsFn collide_fn) {
         }
 
         Profile profiles[6];
-        flush_cache(); // Flush the cache before each iteration
+        //flush_cache(); // Flush the cache before each iteration
         for(int j = 0; j < ITERATIONS; j++) {
-            //flush_cache(); // Flush the cache before each iteration
+            flush_cache(); // Flush the cache before each iteration
             for(int i = 0; i < TEST_CASES; i++) {
                 double rvw1_result[9];
                 double rvw2_result[9];

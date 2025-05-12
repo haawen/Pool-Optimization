@@ -52,6 +52,8 @@
 	#define CPUID() \
 		ASM VOLATILE ("cpuid" : : "a" (0) : "bx", "cx", "dx" )
 
+	
+
 /* ======================== WIN32 ======================= */
 #else
 
@@ -78,6 +80,7 @@ inline void init_tsc() {
 	; // no need to initialize anything for x86
 }
 
+#ifdef _WIN32
 inline myInt64 start_tsc(void) {
     tsc_counter start;
     CPUID();
@@ -86,8 +89,23 @@ inline myInt64 start_tsc(void) {
 }
 
 inline myInt64 stop_tsc(myInt64 start) {
-	tsc_counter end;
-	RDTSC(end);
-	CPUID();
-	return COUNTER_VAL(end) - start;
+    tsc_counter end;
+    RDTSC(end);
+    CPUID();
+    return COUNTER_VAL(end) - start;
 }
+#else
+static inline __attribute__((always_inline)) myInt64 start_tsc(void) {
+    tsc_counter start;
+    CPUID();
+    RDTSC(start);
+    return COUNTER_VAL(start);
+}
+
+static inline __attribute__((always_inline)) myInt64 stop_tsc(myInt64 start) {
+    tsc_counter end;
+    RDTSC(end);
+    CPUID();
+    return COUNTER_VAL(end) - start;
+}
+#endif
