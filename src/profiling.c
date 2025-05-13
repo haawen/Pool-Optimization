@@ -237,19 +237,23 @@ void call_function(const char* name, CollideBallsFn collide_fn) {
         }
 
         Profile profiles[6];
-        flush_cache(); // Flush the cache before each iteration
-        for(int j = 0; j < ITERATIONS; j++) {
-            // flush_cache(); // Flush the cache before each iteration
-            for(int i = 0; i < TEST_CASES; i++) {
-                double rvw1_result[9];
-                double rvw2_result[9];
-                for (int p = 0; p < 6; p++) {
-                    init_profiling_section(&profiles[p]);
-                }
 
-                #ifndef PROFILE
-                myInt64 start = start_tsc();
-                #endif
+        for(int i = 0; i < TEST_CASES; i++) {
+
+            flush_cache(); // Flush the cache before each iteration
+
+            double rvw1_result[9];
+            double rvw2_result[9];
+
+            for (int p = 0; p < 6; p++) {
+                init_profiling_section(&profiles[p]);
+            }
+
+            #ifndef PROFILE
+            myInt64 start = start_tsc();
+            #endif
+
+            for(int j = 0; j < ITERATIONS; j++) {
 
                 collide_fn(
                     reference[i].rvw1,
@@ -268,35 +272,35 @@ void call_function(const char* name, CollideBallsFn collide_fn) {
                     NULL
                 );
 
-                #ifdef PROFILE
-                    summarize_profile(&profiles[0], name, "collide_balls", i, j, csv);
-                    summarize_profile(&profiles[1], name, "Initialization", i, j, csv);
-                    summarize_profile(&profiles[2], name, "Impulse", i, j, csv);
-                    summarize_profile(&profiles[3], name, "Delta", i, j, csv);
-                    summarize_profile(&profiles[4], name, "Velocity", i, j, csv);
-                    summarize_profile(&profiles[5], name, "Transform to World Frame", i, j, csv);
-                #else
-                    myInt64 cycles = stop_tsc(start);
-                    fprintf(csv, "%s,%d,%d,%llu\n", name, i, j, cycles);
-                #endif
-
-
-                TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(tolerance, reference[i].ball1.velocity[0], rvw1_result[3], "Ball 1 Velocity X not within tolerance!");
-                TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(tolerance, reference[i].ball1.velocity[1], rvw1_result[4], "Ball 1 Velocity Y not within tolerance!");
-                TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(tolerance, reference[i].ball1.velocity[2], rvw1_result[5], "Ball 1 Velocity Z not within tolerance!");
-
-                TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(tolerance, reference[i].ball1.angular[0], rvw1_result[6], "Ball 1 Angular Velocity X not within tolerance!");
-                TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(tolerance, reference[i].ball1.angular[1], rvw1_result[7], "Ball 1 Angular Velocity Y not within tolerance!");
-                TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(tolerance, reference[i].ball1.angular[2], rvw1_result[8], "Ball 1 Angular Velocity Z not within tolerance!");
-
-                TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(tolerance, reference[i].ball2.velocity[0], rvw2_result[3], "Ball 2 Velocity X not within tolerance!");
-                TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(tolerance, reference[i].ball2.velocity[1], rvw2_result[4], "Ball 2 Velocity Y not within tolerance!");
-                TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(tolerance, reference[i].ball2.velocity[2], rvw2_result[5], "Ball 2 Velocity Z not within tolerance!");
-
-                TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(tolerance, reference[i].ball2.angular[0], rvw2_result[6], "Ball 2 Angular Velocity X not within tolerance!");
-                TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(tolerance, reference[i].ball2.angular[1], rvw2_result[7], "Ball 2 Angular Velocity Y not within tolerance!");
-                TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(tolerance, reference[i].ball2.angular[2], rvw2_result[8], "Ball 2 Angular Velocity Z not within tolerance!");
             }
+
+            #ifdef PROFILE
+                summarize_profile(&profiles[0], name, "collide_balls", i, 0, csv);
+                summarize_profile(&profiles[1], name, "Initialization", i, 0, csv);
+                summarize_profile(&profiles[2], name, "Impulse", i, 0, csv);
+                summarize_profile(&profiles[3], name, "Delta", i, 0, csv);
+                summarize_profile(&profiles[4], name, "Velocity", i, 0, csv);
+                summarize_profile(&profiles[5], name, "Transform to World Frame", i, 0, csv);
+            #else
+                myInt64 cycles = stop_tsc(start) / ITERATIONS;
+                fprintf(csv, "%s,%d,%d,%llu\n", name, i, 0, cycles);
+            #endif
+
+            TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(tolerance, reference[i].ball1.velocity[0], rvw1_result[3], "Ball 1 Velocity X not within tolerance!");
+            TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(tolerance, reference[i].ball1.velocity[1], rvw1_result[4], "Ball 1 Velocity Y not within tolerance!");
+            TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(tolerance, reference[i].ball1.velocity[2], rvw1_result[5], "Ball 1 Velocity Z not within tolerance!");
+
+            TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(tolerance, reference[i].ball1.angular[0], rvw1_result[6], "Ball 1 Angular Velocity X not within tolerance!");
+            TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(tolerance, reference[i].ball1.angular[1], rvw1_result[7], "Ball 1 Angular Velocity Y not within tolerance!");
+            TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(tolerance, reference[i].ball1.angular[2], rvw1_result[8], "Ball 1 Angular Velocity Z not within tolerance!");
+
+            TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(tolerance, reference[i].ball2.velocity[0], rvw2_result[3], "Ball 2 Velocity X not within tolerance!");
+            TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(tolerance, reference[i].ball2.velocity[1], rvw2_result[4], "Ball 2 Velocity Y not within tolerance!");
+            TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(tolerance, reference[i].ball2.velocity[2], rvw2_result[5], "Ball 2 Velocity Z not within tolerance!");
+
+            TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(tolerance, reference[i].ball2.angular[0], rvw2_result[6], "Ball 2 Angular Velocity X not within tolerance!");
+            TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(tolerance, reference[i].ball2.angular[1], rvw2_result[7], "Ball 2 Angular Velocity Y not within tolerance!");
+            TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(tolerance, reference[i].ball2.angular[2], rvw2_result[8], "Ball 2 Angular Velocity Z not within tolerance!");
         }
 
         fclose(csv);
@@ -352,9 +356,9 @@ int main() {
         RUN_TEST(test_collide_balls_basic);
         RUN_TEST(test_less_sqrt);
         RUN_TEST(test_collide_balls_code_motion);
-        // RUN_TEST(test_precomp);
-        // RUN_TEST(test_branch_prediction);
-        // RUN_TEST(test_remove_unused_branches);
+        RUN_TEST(test_precomp);
+        RUN_TEST(test_branch_prediction);
+        RUN_TEST(test_remove_unused_branches);
        // RUN_TEST(test_collide_balls_simd);
     int result = UNITY_END();
 

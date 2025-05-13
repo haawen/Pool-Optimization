@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.10)
 project(pool C)
 
+# set(CMAKE_C_COMPILER "clang")
+
 set(UNITY_DIR ext/unity/src)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -25,7 +27,16 @@ target_compile_options(profiling PRIVATE -O3 -ffast-math -march=native -Wall -pe
 target_compile_definitions(profiling PRIVATE UNITY_INCLUDE_DOUBLE)
 
 add_executable(benchmark src/profiling.c ${SOURCES} ${UNITY_DIR}/unity.c)
-target_compile_options(benchmark PRIVATE -O3 -ffast-math -march=native -Wall -pedantic -mavx)
+target_compile_options(benchmark PRIVATE
+    -O3
+    -ffast-math
+    -march=native
+    -Wall
+    -pedantic
+    -mavx
+    -funroll-loops
+    -ftree-vectorize
+)
 target_compile_definitions(benchmark PRIVATE UNITY_INCLUDE_DOUBLE)
 
 add_executable(flops src/flops.c ${SOURCES})

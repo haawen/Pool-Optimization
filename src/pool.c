@@ -1828,13 +1828,12 @@ DLL_EXPORT void code_motion_collide_balls2(double* rvw1, double* rvw2, float R, 
     double* angular_velocity_2 = &rvw2[6];
 
     FLOPS(3, 0, 0, 0, complete_function, before_loop);
-    double forward[4]; // Forward from ball 1 to ball 2, normalized
+    double forward[3]; // Forward from ball 1 to ball 2, normalized, forard[2] will always be zero
     forward[0] = translation_2[0] - translation_1[0];
     forward[1] = translation_2[1] - translation_1[1];
-    forward[2] = translation_2[2] - translation_1[2];
 
     FLOPS(2, 3, 0, 0, complete_function, before_loop);
-    double offset_mag = forward[0] * forward[0] + forward[1] * forward[1] + forward[2] * forward[2];
+    double offset_mag = forward[0] * forward[0] + forward[1] * forward[1] ;
 
     FLOPS(0, 0, 0, 1, complete_function, before_loop);
     offset_mag = sqrt(offset_mag);
@@ -1842,35 +1841,33 @@ DLL_EXPORT void code_motion_collide_balls2(double* rvw1, double* rvw2, float R, 
     FLOPS(0, 0, 3, 0, complete_function, before_loop);
     forward[0] = forward[0] / offset_mag;
     forward[1] = forward[1] / offset_mag;
-    forward[2] = forward[2] / offset_mag;
 
     FLOPS(1, 0, 0, 0, complete_function, before_loop);
-    forward[3] = -forward[0];
+    forward[2] = -forward[0]; // This is the same as right[1]
 
     // From here on, it is assumed that the x axis is the right axis and y axis is the forward axis
     // Transform velocities to local frame
 
     FLOPS(2, 4, 0, 0, complete_function, before_loop);
-    double local_velocity_x_1 = velocity_1[0] * forward[1] + velocity_1[1] * forward[3];
-    double local_velocity_x_2 = velocity_2[0] * forward[1] + velocity_2[1] * forward[3];
+    double local_velocity_x_1 = velocity_1[0] * forward[1] + velocity_1[1] * forward[2];
+    double local_velocity_x_2 = velocity_2[0] * forward[1] + velocity_2[1] * forward[2];
 
-    FLOPS(4, 6, 0, 0, complete_function, before_loop);
-    double local_velocity_y_1 = dotV3(velocity_1, forward);
-    double local_velocity_y_2 = dotV3(velocity_2, forward);
+    FLOPS(2, 4, 0, 0, complete_function, before_loop);
+    double local_velocity_y_1 = velocity_1[0] * forward[0] + velocity_1[1] * forward[1];
+    double local_velocity_y_2 = velocity_2[0] * forward[0] + velocity_2[1] * forward[1];
 
     // Transform angular velocities into local frame
 
     FLOPS(2, 4, 0, 0, complete_function, before_loop);
-    double local_angular_velocity_x_1 = angular_velocity_1[0] * forward[1] + angular_velocity_1[1] * forward[3];
-    double local_angular_velocity_x_2 = angular_velocity_2[0] * forward[1] + angular_velocity_2[1] * forward[3];
+    double local_angular_velocity_x_1 = angular_velocity_1[0] * forward[1] + angular_velocity_1[1] * forward[2];
+    double local_angular_velocity_x_2 = angular_velocity_2[0] * forward[1] + angular_velocity_2[1] * forward[2];
 
-    FLOPS(4, 6, 0, 0, complete_function, before_loop);
-    double local_angular_velocity_y_1 = dotV3(angular_velocity_1, forward);
-    double local_angular_velocity_y_2 = dotV3(angular_velocity_2, forward);
+    FLOPS(2, 4, 0, 0, complete_function, before_loop);
+    double local_angular_velocity_y_1 = angular_velocity_1[0] * forward[0] + angular_velocity_1[1] * forward[1];
+    double local_angular_velocity_y_2 = angular_velocity_2[0] * forward[0] + angular_velocity_2[1] * forward[1];
 
     double local_angular_velocity_z_1 = angular_velocity_1[2];
     double local_angular_velocity_z_2 = angular_velocity_2[2];
-
 
     // Calculate velocity at contact point
     // = Calculate ball-table slips?
@@ -1926,7 +1923,7 @@ DLL_EXPORT void code_motion_collide_balls2(double* rvw1, double* rvw2, float R, 
     END_PROFILE(before_loop);
 
     while (__builtin_expect(velocity_diff_y < 0 || total_work < work_required, true)) {
-
+        BRANCH(11);
         START_PROFILE(impulse);
 
         // Impulse Calculation
@@ -2054,6 +2051,7 @@ DLL_EXPORT void code_motion_collide_balls2(double* rvw1, double* rvw2, float R, 
         total_work += 0.5 * deltaP * fabs(velocity_diff_y_temp + velocity_diff_y);
 
         if (__builtin_expect(work_compression == 0 && velocity_diff_y > 0, false)) {
+            BRANCH(10);
             work_compression = total_work;
             FLOPS(1, 2, 0, 0, complete_function, velocity);
             work_required = (1.0 + e_b * e_b) * work_compression;
@@ -2074,16 +2072,16 @@ DLL_EXPORT void code_motion_collide_balls2(double* rvw1, double* rvw2, float R, 
 
     MEMORY(4, complete_function, after_loop);
     FLOPS(2, 4, 0, 0, complete_function, after_loop);
-    rvw1_result[4] = local_velocity_x_1 * forward[3] + local_velocity_y_1 * forward[1];
-    rvw2_result[4] = local_velocity_x_2 * forward[3] + local_velocity_y_2 * forward[1];
+    rvw1_result[4] = local_velocity_x_1 * forward[2] + local_velocity_y_1 * forward[1];
+    rvw2_result[4] = local_velocity_x_2 * forward[2] + local_velocity_y_2 * forward[1];
     FLOPS(2, 4, 0, 0, complete_function, after_loop);
-    rvw1_result[7] = local_angular_velocity_x_1 * forward[3] + local_angular_velocity_y_1 * forward[1];
-    rvw2_result[7] = local_angular_velocity_x_2 * forward[3] + local_angular_velocity_y_2 * forward[1];
+    rvw1_result[7] = local_angular_velocity_x_1 * forward[2] + local_angular_velocity_y_1 * forward[1];
+    rvw2_result[7] = local_angular_velocity_x_2 * forward[2] + local_angular_velocity_y_2 * forward[1];
 
     MEMORY(4, complete_function, after_loop);
     FLOPS(0, 2, 0, 0, complete_function, after_loop);
-    rvw1_result[5] = local_velocity_y_1 * forward[2];
-    rvw2_result[5] = local_velocity_y_2 * forward[2];
+    rvw1_result[5] = 0.0;
+    rvw2_result[5] = 0.0;
     rvw1_result[8] = local_angular_velocity_z_1;
     rvw2_result[8] = local_angular_velocity_z_2;
 
