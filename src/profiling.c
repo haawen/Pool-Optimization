@@ -4,7 +4,7 @@
 #include "unity.h"
 #include <stdlib.h>
 
-#define WARMUP 100
+#define WARMUP 1000
 #define ITERATIONS 10000
 #define FLUSH_SIZE (32 * 1024 * 1024)  // 32MB buffer
 
@@ -323,7 +323,7 @@ void test_remove_unused_branches(void) {
 }
 
 void test_collide_balls_code_motion(void) {
-    call_function("Code Motion", code_motion_collide_balls);
+    call_function("Code Motion", code_motion_collide_balls2);
 }
 
 void test_collide_balls_simd(void) {
@@ -351,10 +351,10 @@ int main() {
     UNITY_BEGIN();
         RUN_TEST(test_collide_balls_basic);
         RUN_TEST(test_less_sqrt);
-        RUN_TEST(test_precomp);
-        RUN_TEST(test_branch_prediction);
-        RUN_TEST(test_remove_unused_branches);
         RUN_TEST(test_collide_balls_code_motion);
+        // RUN_TEST(test_precomp);
+        // RUN_TEST(test_branch_prediction);
+        // RUN_TEST(test_remove_unused_branches);
        // RUN_TEST(test_collide_balls_simd);
     int result = UNITY_END();
 

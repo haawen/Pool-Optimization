@@ -104,9 +104,6 @@ plt.title(f"Cycles Benchmark")
 plt.savefig(f"plots/benchmark.png")
 plt.close()
 
-exit(0)
-
-
 ## Cost
 for opi, op in enumerate(["ADDS", "MULS", "DIVS", "SQRT"]):
     fig, ax = plt.subplots(figsize=(12, 6))  # ✅ This gives both fig and ax
