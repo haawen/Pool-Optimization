@@ -1,11 +1,13 @@
-#include "pool.h"
 #include <stdbool.h>
 #include <stdio.h>
-#include "unity.h"
 #include <stdlib.h>
+#include <time.h>
+#include "unity.h"
+#include "pool.h"
 
 #define WARMUP 1000
 #define ITERATIONS 10000
+#define TEST_RUNNER_ITERATIONS 5 // Rerun all TestCases (so warmup + iterations) in Random Order
 #define FLUSH_SIZE (32 * 1024 * 1024)  // 32MB buffer
 
 #ifdef PROFILE
@@ -318,6 +320,10 @@ void test_less_sqrt(void) {
     call_function("Less SQRT", less_sqrt_collide_balls);
 }
 
+void test_less_sqrt2(void) {
+    call_function("Less SQRT 2", less_sqrt_collide_balls2);
+}
+
 void test_branch_prediction(void) {
     call_function("Branch Pred", branch_prediction_collide_balls);
 }
@@ -331,7 +337,7 @@ void test_collide_balls_code_motion(void) {
 }
 
 void test_collide_balls_simd(void) {
-    // call_function("SIMD", simd_collide_balls);
+    call_function("SIMD", simd_collide_balls);
 }
 
 int main() {
@@ -352,14 +358,42 @@ int main() {
     #endif
     fclose(csv);
 
+    srand((unsigned int)time(NULL));
+
+    void (*tests[])(void) = {
+        test_collide_balls_basic,
+        // test_precomp,
+        test_less_sqrt,
+        test_less_sqrt2,
+        // test_branch_prediction,
+        // test_remove_unused_branches,
+        // test_collide_balls_code_motion,
+        // test_collide_balls_simd,
+    };
+
+    const int num_tests = sizeof(tests) / sizeof(tests[0]);
+
     UNITY_BEGIN();
-        RUN_TEST(test_collide_balls_basic);
-        RUN_TEST(test_less_sqrt);
-        RUN_TEST(test_collide_balls_code_motion);
-        RUN_TEST(test_precomp);
-        RUN_TEST(test_branch_prediction);
-        RUN_TEST(test_remove_unused_branches);
-       // RUN_TEST(test_collide_balls_simd);
+
+
+        for(int i = 0; i < TEST_RUNNER_ITERATIONS; i++) {
+
+
+             // Fisher–Yates shuffle
+            for (int i = num_tests - 1; i > 0; i--) {
+                int j = rand() % (i + 1);
+                void (*tmp)(void) = tests[i];
+                tests[i] = tests[j];
+                tests[j] = tmp;
+            }
+
+            for (int i = 0; i < num_tests; i++) {
+                RUN_TEST(tests[i]);
+            }
+
+            printf("=== Finished Test Iteration %d/%d === \n\n", i+1, TEST_RUNNER_ITERATIONS);
+        }
+
     int result = UNITY_END();
 
     printf("\n=== Now Run python plot.py to visualize profiling results. ==\n");

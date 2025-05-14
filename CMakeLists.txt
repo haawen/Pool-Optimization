@@ -17,35 +17,45 @@ set(SOURCES
     src/math_helper.c
 )
 
+set(FLAGS
+    -O3
+    -ffast-math
+    -march=native
+    -mavx
+    -mfma
+    -funroll-loops
+
+    -Wall
+    -pedantic
+)
+
 add_library(pool_shared SHARED ${SOURCES})
-target_compile_options(pool_shared PRIVATE -mavx)
+target_compile_options(pool_shared PRIVATE ${FLAGS})
 
 include_directories(${UNITY_DIR})
 add_executable(profiling src/profiling.c ${SOURCES} ${UNITY_DIR}/unity.c)
 target_compile_definitions(profiling PRIVATE PROFILE)
-target_compile_options(profiling PRIVATE -O3 -ffast-math -march=native -Wall -pedantic -mavx)
+target_compile_options(profiling PRIVATE ${FLAGS})
 target_compile_definitions(profiling PRIVATE UNITY_INCLUDE_DOUBLE)
 
 add_executable(benchmark src/profiling.c ${SOURCES} ${UNITY_DIR}/unity.c)
-target_compile_options(benchmark PRIVATE
-    -O3
-    -ffast-math
-    -march=native
-    -Wall
-    -pedantic
-    -mavx
-    -funroll-loops
-    -ftree-vectorize
-)
+target_compile_options(benchmark PRIVATE ${FLAGS})
 target_compile_definitions(benchmark PRIVATE UNITY_INCLUDE_DOUBLE)
+
+add_executable(single_performance src/single_performance.c ${SOURCES} )
+target_compile_options(single_performance PRIVATE
+    ${FLAGS}
+    -g # Debug information, not a optimization, used for valgrind
+)
 
 add_executable(flops src/flops.c ${SOURCES})
 target_compile_definitions(flops PRIVATE PROFILE FLOP_COUNT)
-target_compile_options(flops PRIVATE -mavx)
+target_compile_options(flops PRIVATE ${FLAGS})
 
 if(UNIX)
     target_link_libraries(pool_shared m)
     target_link_libraries(profiling m)
+    target_link_libraries(single_performance m)
     target_link_libraries(benchmark m)
     target_link_libraries(flops m)
 endif()

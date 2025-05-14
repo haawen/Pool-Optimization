@@ -37,6 +37,7 @@ color_styles = {
     "Basic Implementation": "blue",
     "Code Motion": "green",
     "Less SQRT": "purple",
+    "Less SQRT 2": "orchid",
     "Branch Pred": "grey",
     "Removed Unused Branches": "#aec6cf",
     "SIMD": "orange",
@@ -103,6 +104,8 @@ plt.title(f"Cycles Benchmark")
 
 plt.savefig(f"plots/benchmark.png")
 plt.close()
+
+exit()
 
 ## Cost
 for opi, op in enumerate(["ADDS", "MULS", "DIVS", "SQRT"]):
