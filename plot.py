@@ -42,6 +42,7 @@ color_styles = {
     "Removed Unused Branches": "#aec6cf",
     "SIMD": "orange",
     "Precompute": "gold",
+    "Scalar Improvements": "red",
 }
 
 fig, ax = plt.subplots(figsize=(12, 6))  # ✅ This gives both fig and ax

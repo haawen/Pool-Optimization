@@ -18,15 +18,19 @@ set(SOURCES
 )
 
 set(FLAGS
-    -O3
+    -Ofast
     -ffast-math
-    -march=native
-    -mavx
-    -mfma
-    -funroll-loops
-
+    #-march=native # unpredictable, most of the times worsens
     -Wall
     -pedantic
+    -mfma
+    -fno-math-errno
+    #-mavx2          # We dont do SIMD yet
+
+    -funroll-loops
+
+    -ftree-vectorize
+    #-flto          # Worsens
 )
 
 add_library(pool_shared SHARED ${SOURCES})
@@ -40,6 +44,7 @@ target_compile_definitions(profiling PRIVATE UNITY_INCLUDE_DOUBLE)
 
 add_executable(benchmark src/profiling.c ${SOURCES} ${UNITY_DIR}/unity.c)
 target_compile_options(benchmark PRIVATE ${FLAGS})
+
 target_compile_definitions(benchmark PRIVATE UNITY_INCLUDE_DOUBLE)
 
 add_executable(single_performance src/single_performance.c ${SOURCES} )
