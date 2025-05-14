@@ -2604,7 +2604,6 @@ DLL_EXPORT void code_motion_collide_balls2(double* rvw1, double* rvw2, float R, 
 // https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html
 DLL_EXPORT void simd_collide_balls(double* rvw1, double* rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double* rvw1_result, double* rvw2_result, Profile* profiles, Branch* branches) {
 
-    /*
     #ifdef PROFILE
         Profile* complete_function = &profiles[0];
         Profile* before_loop = &profiles[1];
@@ -2648,23 +2647,23 @@ DLL_EXPORT void simd_collide_balls(double* rvw1, double* rvw2, float R, float M,
     // From here on, it is assumed that the x axis is the right axis and y axis is the forward axis
     // Transform velocities to local frame
     FLOPS(2, 4, 0, 0, complete_function, before_loop);
-    double local_velocity_x_1 = velocity_1[0] * forward[1] + velocity_1[1] * forward[2];
-    double local_velocity_x_2 = velocity_2[0] * forward[1] + velocity_2[1] * forward[2];
+    double _local_velocity_x_1 = velocity_1[0] * forward[1] + velocity_1[1] * forward[2];
+    double _local_velocity_x_2 = velocity_2[0] * forward[1] + velocity_2[1] * forward[2];
 
     FLOPS(2, 4, 0, 0, complete_function, before_loop);
-    double local_velocity_y_1 = velocity_1[0] * forward[0] + velocity_1[1] * forward[1];
-    double local_velocity_y_2 = velocity_2[0] * forward[0] + velocity_2[1] * forward[1];
+    double _local_velocity_y_1 = velocity_1[0] * forward[0] + velocity_1[1] * forward[1];
+    double _local_velocity_y_2 = velocity_2[0] * forward[0] + velocity_2[1] * forward[1];
 
 
     // Transform angular velocities into local frame
 
     FLOPS(2, 4, 0, 0, complete_function, before_loop);
-    double local_angular_velocity_x_1 = angular_velocity_1[0] * forward[1] + angular_velocity_1[1] * forward[2];
-    double local_angular_velocity_x_2 = angular_velocity_2[0] * forward[1] + angular_velocity_2[1] * forward[2];
+    double _local_angular_velocity_x_1 = angular_velocity_1[0] * forward[1] + angular_velocity_1[1] * forward[2];
+    double _local_angular_velocity_x_2 = angular_velocity_2[0] * forward[1] + angular_velocity_2[1] * forward[2];
 
     FLOPS(2, 4, 0, 0, complete_function, before_loop);
-    double local_angular_velocity_y_1 = angular_velocity_1[0] * forward[0] + angular_velocity_1[1] * forward[1];
-    double local_angular_velocity_y_2 = angular_velocity_2[0] * forward[0] + angular_velocity_2[1] * forward[1];
+    double _local_angular_velocity_y_1 = angular_velocity_1[0] * forward[0] + angular_velocity_1[1] * forward[1];
+    double _local_angular_velocity_y_2 = angular_velocity_2[0] * forward[0] + angular_velocity_2[1] * forward[1];
 
     double local_angular_velocity_z_1 = angular_velocity_1[2];
     double local_angular_velocity_z_2 = angular_velocity_2[2];
@@ -2672,14 +2671,13 @@ DLL_EXPORT void simd_collide_balls(double* rvw1, double* rvw2, float R, float M,
 
     // SIMD Prep
     // [x1, y1, x2, y2]
-    __m256d velocities = _mm256_set_pd(local_velocity_y_2, local_velocity_x_2, local_velocity_y_1, local_velocity_x_1);
+    __m256d velocities = _mm256_set_pd(_local_velocity_y_2, _local_velocity_x_2, _local_velocity_y_1, _local_velocity_x_1);
 
     // [y1, x1, y2, x2] !!! ! Y is first such that we can skip reorderring before surface calculation
-    __m256d angular = _mm256_set_pd(local_angular_velocity_x_2, local_angular_velocity_y_2, local_angular_velocity_x_1, local_angular_velocity_y_1);
-    __m256d R4 = _mm256_set_pd(-R, R, -R, R);
-
+    __m256d angular = _mm256_set_pd(_local_angular_velocity_x_2, _local_angular_velocity_y_2, _local_angular_velocity_x_1, _local_angular_velocity_y_1);
+    __m256d R4 = _mm256_set_pd((double)(-R), (double)R, (double)(-R), R); // TODO: could use fm_addsub instead of this?
+    __m256d M4 = _mm256_set1_pd((double)M);
     // [x1, y1, x2, y2]
-    __m256d surface_velocities = _mm256_fmadd_pd(R4, angular, velocities);
     __m256d surface_velocities = _mm256_fmadd_pd(R4, angular, velocities);
 
     // Calculate velocity at contact point
@@ -2687,29 +2685,29 @@ DLL_EXPORT void simd_collide_balls(double* rvw1, double* rvw2, float R, float M,
     // Slip refers to relative motion between two surfaces in contact — here, the ball and the table.
     // Its the velocity at the contact point of the table and the ball
 
-
     // FLOPS(4, 4, 0, 0, complete_function, before_loop);
     // double surface_velocity_x_1 = local_velocity_x_1 + R * local_angular_velocity_y_1;
     // double surface_velocity_y_1 = local_velocity_y_1 - R * local_angular_velocity_x_1;
     // double surface_velocity_x_2 = local_velocity_x_2 + R * local_angular_velocity_y_2;
     // double surface_velocity_y_2 = local_velocity_y_2 - R * local_angular_velocity_x_2;
 
-    FLOPS(2, 4, 0, 0, complete_function, before_loop);
-    double surface_velocity_magnitude_1_sqrd = (surface_velocity_x_1 * surface_velocity_x_1 + surface_velocity_y_1 * surface_velocity_y_1);
-    double surface_velocity_magnitude_2_sqrd = (surface_velocity_x_2 * surface_velocity_x_2 + surface_velocity_y_2 * surface_velocity_y_2);
+    // FLOPS(2, 4, 0, 0, complete_function, before_loop);
+    // double surface_velocity_magnitude_1_sqrd = (surface_velocity_x_1 * surface_velocity_x_1 + surface_velocity_y_1 * surface_velocity_y_1);
+    // double surface_velocity_magnitude_2_sqrd = (surface_velocity_x_2 * surface_velocity_x_2 + surface_velocity_y_2 * surface_velocity_y_2);
 
     // Relative surface velocity in the x-direction at the point where the two balls are in contact.
     // ball-ball slip
     FLOPS(5, 4, 0, 1, complete_function, before_loop);
-    double contact_point_velocity_x = local_velocity_x_1 - local_velocity_x_2 - R * (local_angular_velocity_z_1 + local_angular_velocity_z_2);
-    double contact_point_velocity_z = R * (local_angular_velocity_x_1 + local_angular_velocity_x_2);
+
+    double contact_point_velocity_x = _local_velocity_x_1 - _local_velocity_x_2 - R * (local_angular_velocity_z_1 + local_angular_velocity_z_2);
+    double contact_point_velocity_z = R * (_local_angular_velocity_x_1 + _local_angular_velocity_x_2);
     double ball_ball_contact_point_magnitude = sqrt(contact_point_velocity_x * contact_point_velocity_x + contact_point_velocity_z * contact_point_velocity_z);
     //printf("\nC Contact Point Slide, Spin:\n");
     //printf("  Contact Point: u_ijC_xz_mag= %.6f\n", ball_ball_contact_point_magnitude);
 
     // Main collision loop
     FLOPS(1, 0, 0, 0, complete_function, before_loop);
-    double velocity_diff_y = local_velocity_y_2 - local_velocity_y_1;
+    double velocity_diff_y = _local_velocity_y_2 - _local_velocity_y_1;
 
     // deltaP is most likely always 0?
     // ΔP represents the Impulse during a time of Δt
@@ -2720,6 +2718,8 @@ DLL_EXPORT void simd_collide_balls(double* rvw1, double* rvw2, float R, float M,
 
     FLOPS(0, 2, 1, 0, complete_function, before_loop);
     double C = 5.0 / (2.0 * M * R);
+    __m256d C4 = _mm256_set1_pd(C);
+
     double total_work = 0; // Work done due to impulse force
     double work_required = INFINITY; // Total amount of work required before collision handling is complete
     double work_compression = 0;
@@ -2762,6 +2762,15 @@ DLL_EXPORT void simd_collide_balls(double* rvw1, double* rvw2, float R, float M,
                 deltaP_x_2 = 0;
                 deltaP_y_2 = 0;
             } else {
+
+                double test[4];
+                _mm256_storeu_pd(test, surface_velocities);
+                double surfx1 = test[0];
+                double surfy1 = test[1];
+                double surfx2 = test[2];
+                double surfy2 = test[3];
+
+
                 BRANCH(3);
                 FLOPS(1, 2, 1, 0, complete_function, impulse);
                 deltaP_2 = -u_b * deltaP * contact_point_velocity_z / ball_ball_contact_point_magnitude;
@@ -2772,31 +2781,31 @@ DLL_EXPORT void simd_collide_balls(double* rvw1, double* rvw2, float R, float M,
                     deltaP_y_1 = 0;
 
                     // TODO: probably best to check for some tolerance
-                    if(__builtin_expect(surface_velocity_magnitude_2_sqrd == 0.0, false)) {
+                    if(__builtin_expect(surfx2 == 0.0 && surfy2 == 0.0, false)) {
                         BRANCH(5);
                         deltaP_x_2 = 0;
                         deltaP_y_2 = 0;
                     } else {
                         BRANCH(6);
                         FLOPS(2, 4, 2, 1, complete_function, impulse);
-                        double surface_velocity_magnitude_2 = sqrt(surface_velocity_magnitude_2_sqrd);
-                        deltaP_x_2 = -u_s2 * (surface_velocity_x_2 / surface_velocity_magnitude_2) * deltaP_2;
-                        deltaP_y_2 = -u_s2 * (surface_velocity_y_2 / surface_velocity_magnitude_2) * deltaP_2;
+                        double surface_velocity_magnitude_2 = sqrt(surfx2 * surfx2 + surfy2*surfy2);
+                        deltaP_x_2 = -u_s2 * (surfx2 / surface_velocity_magnitude_2) * deltaP_2;
+                        deltaP_y_2 = -u_s2 * (surfy2 / surface_velocity_magnitude_2) * deltaP_2;
                     }
                 } else {
                     BRANCH(7);
                     deltaP_x_2 = 0;
                     deltaP_y_2 = 0;
-                    if(__builtin_expect(surface_velocity_magnitude_1_sqrd == 0.0, false)) {
+                    if(__builtin_expect(surfx1 == 0.0 && surfy1 == 0.0, false)) {
                         BRANCH(8);
                         deltaP_x_1 = 0;
                         deltaP_y_1 = 0;
                     } else {
                         BRANCH(9);
                         FLOPS(0, 4, 2, 1, complete_function, impulse);
-                        double surface_velocity_magnitude_1 = sqrt(surface_velocity_magnitude_1_sqrd);
-                        deltaP_x_1 = u_s1 * (surface_velocity_x_1 / surface_velocity_magnitude_1) * deltaP_2;
-                        deltaP_y_1 = u_s1 * (surface_velocity_y_1 / surface_velocity_magnitude_1) * deltaP_2;
+                        double surface_velocity_magnitude_1 = sqrt(surfx1 * surfx1 + surfy1*surfy1);
+                        deltaP_x_1 = u_s1 * (surfx1 / surface_velocity_magnitude_1) * deltaP_2;
+                        deltaP_y_1 = u_s1 * (surfy1 / surface_velocity_magnitude_1) * deltaP_2;
                     }
                 }
 
@@ -2808,35 +2817,44 @@ DLL_EXPORT void simd_collide_balls(double* rvw1, double* rvw2, float R, float M,
 
         FLOPS(6, 0, 4, 0, complete_function, delta);
         // Velocity changes
-        double velocity_change_x_1 = (deltaP_1 + deltaP_x_1) / M;
-        double velocity_change_y_1 = (-deltaP + deltaP_y_1) / M;
-        double velocity_change_x_2 = (-deltaP_1 + deltaP_x_2) / M;
-        double velocity_change_y_2 = (deltaP + deltaP_y_2) / M;
+        __m256d delta_velocites = _mm256_set_pd(deltaP + deltaP_y_2, -deltaP_1 + deltaP_x_2, -deltaP + deltaP_y_1, deltaP_1 + deltaP_x_1);
+        velocities = _mm256_add_pd(velocities, _mm256_div_pd(delta_velocites, M4));
+        // double velocity_change_x_1 = (deltaP_1 + deltaP_x_1) / M;
+        // double velocity_change_y_1 = (-deltaP + deltaP_y_1) / M;
+        // double velocity_change_x_2 = (-deltaP_1 + deltaP_x_2) / M;
+        // double velocity_change_y_2 = (deltaP + deltaP_y_2) / M;
 
-        FLOPS(4, 0, 0, 0, complete_function, delta);
+        // FLOPS(4, 0, 0, 0, complete_function, delta);
         // Update velocities
-        local_velocity_x_1 += velocity_change_x_1;
-        local_velocity_y_1 += velocity_change_y_1;
-        local_velocity_x_2 += velocity_change_x_2;
-        local_velocity_y_2 += velocity_change_y_2;
+        // local_velocity_x_1 += velocity_change_x_1;
+        // local_velocity_y_1 += velocity_change_y_1;
+        // local_velocity_x_2 += velocity_change_x_2;
+        // local_velocity_y_2 += velocity_change_y_2;
 
         FLOPS(6, 6, 0, 0, complete_function, delta);
+
+        // [y1, x1, y2, x2] !!! ! Y is first such that we can skip reorderring before surface calculation
+        __m256d delta_angular = _mm256_set_pd(deltaP_2 + deltaP_y_2, -deltaP_x_2, deltaP_2 + deltaP_y_1, -deltaP_x_1);
+        angular = _mm256_fmadd_pd(C4, delta_angular, angular);
+
         // Angular velocity changes
-        double delta_angular_velocity_x_1 = C * (deltaP_2 + deltaP_y_1);
-        double delta_angular_velocity_y_1 = C * (-deltaP_x_1);
+        // double delta_angular_velocity_x_1 = C * (deltaP_2 + deltaP_y_1);
+        // double delta_angular_velocity_y_1 = C * (-deltaP_x_1);
+        // double delta_angular_velocity_x_2 = C * (deltaP_2 + deltaP_y_2);
+        // double delta_angular_velocity_y_2 = C * (-deltaP_x_2);
+
         double delta_angular_velocity_z_1 = C * (-deltaP_1);
-        double delta_angular_velocity_x_2 = C * (deltaP_2 + deltaP_y_2);
-        double delta_angular_velocity_y_2 = C * (-deltaP_x_2);
         double delta_angular_velocity_z_2 = C * (-deltaP_1);
 
         FLOPS(6, 0, 0, 0, complete_function, delta);
         // Update Angular Velocities
-        local_angular_velocity_x_1 += delta_angular_velocity_x_1;
-        local_angular_velocity_y_1 += delta_angular_velocity_y_1;
-        local_angular_velocity_z_1 += delta_angular_velocity_z_1;
+        // local_angular_velocity_x_1 += delta_angular_velocity_x_1;
+        // local_angular_velocity_y_1 += delta_angular_velocity_y_1;
 
-        local_angular_velocity_x_2 += delta_angular_velocity_x_2;
-        local_angular_velocity_y_2 += delta_angular_velocity_y_2;
+        // local_angular_velocity_x_2 += delta_angular_velocity_x_2;
+        // local_angular_velocity_y_2 += delta_angular_velocity_y_2;
+
+        local_angular_velocity_z_1 += delta_angular_velocity_z_1;
         local_angular_velocity_z_2 += delta_angular_velocity_z_2;
 
         END_PROFILE(delta);
@@ -2844,25 +2862,41 @@ DLL_EXPORT void simd_collide_balls(double* rvw1, double* rvw2, float R, float M,
 
         FLOPS(4, 4, 0, 0, complete_function, velocity);
         // update ball-table slips
-        surface_velocity_x_1 = local_velocity_x_1 + R * local_angular_velocity_y_1;
-        surface_velocity_y_1 = local_velocity_y_1 - R * local_angular_velocity_x_1;
-        surface_velocity_x_2 = local_velocity_x_2 + R * local_angular_velocity_y_2;
-        surface_velocity_y_2 = local_velocity_y_2 - R * local_angular_velocity_x_2;
+        // surface_velocity_x_1 = local_velocity_x_1 + R * local_angular_velocity_y_1;
+        // surface_velocity_y_1 = local_velocity_y_1 - R * local_angular_velocity_x_1;
+        // surface_velocity_x_2 = local_velocity_x_2 + R * local_angular_velocity_y_2;
+        // surface_velocity_y_2 = local_velocity_y_2 - R * local_angular_velocity_x_2;
 
-        FLOPS(2, 4, 0, 0, complete_function, velocity);
-        surface_velocity_magnitude_1_sqrd = (surface_velocity_x_1 * surface_velocity_x_1 + surface_velocity_y_1 * surface_velocity_y_1);
-        surface_velocity_magnitude_2_sqrd = (surface_velocity_x_2 * surface_velocity_x_2 + surface_velocity_y_2 * surface_velocity_y_2);
+        surface_velocities = _mm256_fmadd_pd(R4, angular, velocities);
+
+        // FLOPS(2, 4, 0, 0, complete_function, velocity);
+        // surface_velocity_magnitude_1_sqrd = (surface_velocity_x_1 * surface_velocity_x_1 + surface_velocity_y_1 * surface_velocity_y_1);
+        // surface_velocity_magnitude_2_sqrd = (surface_velocity_x_2 * surface_velocity_x_2 + surface_velocity_y_2 * surface_velocity_y_2);
+
+        double test[4];
+        _mm256_storeu_pd(test, velocities);
+        _local_velocity_x_1 = test[0];
+        _local_velocity_y_1 = test[1];
+        _local_velocity_x_2 = test[2];
+        _local_velocity_y_2 = test[3];
+
+        double test_a[4];
+        _mm256_storeu_pd(test, angular);
+        _local_angular_velocity_y_1 = test[0];
+        _local_angular_velocity_x_1 = test[1];
+        _local_angular_velocity_y_2 = test[2];
+        _local_angular_velocity_x_2 = test[3];
 
         FLOPS(5, 4, 0, 1, complete_function, velocity);
         // update ball-ball slip:
-        contact_point_velocity_x = local_velocity_x_1 - local_velocity_x_2 - R * (local_angular_velocity_z_1 + local_angular_velocity_z_2);
-        contact_point_velocity_z = R * (local_angular_velocity_x_1 + local_angular_velocity_x_2);
+        contact_point_velocity_x = _local_velocity_x_1 - _local_velocity_x_2 - R * (local_angular_velocity_z_1 + local_angular_velocity_z_2);
+        contact_point_velocity_z = R * (_local_angular_velocity_x_1 + _local_angular_velocity_x_2);
         ball_ball_contact_point_magnitude = sqrt(contact_point_velocity_x * contact_point_velocity_x + contact_point_velocity_z * contact_point_velocity_z);
 
         FLOPS(3, 2, 0, 0, complete_function, velocity);
         // Update work and check compression phase
         double velocity_diff_y_temp = velocity_diff_y;
-        velocity_diff_y = local_velocity_y_2 - local_velocity_y_1;
+        velocity_diff_y = _local_velocity_y_2 - _local_velocity_y_1;
         total_work += 0.5 * deltaP * fabs(velocity_diff_y_temp + velocity_diff_y);
 
         if (__builtin_expect(work_compression == 0 && velocity_diff_y > 0, false)) {
@@ -2877,21 +2911,35 @@ DLL_EXPORT void simd_collide_balls(double* rvw1, double* rvw2, float R, float M,
 
     START_PROFILE(after_loop);
 
-    MEMORY(4, complete_function, after_loop);
-    FLOPS(2, 4, 0, 0, complete_function, after_loop);
-    rvw1_result[3] = local_velocity_x_1 * forward[1] + local_velocity_y_1 * forward[0];
-    rvw2_result[3] = local_velocity_x_2 * forward[1] + local_velocity_y_2 * forward[0];
-    FLOPS(2, 4, 0, 0, complete_function, after_loop);
-    rvw1_result[6] = local_angular_velocity_x_1 * forward[1] + local_angular_velocity_y_1 * forward[0];
-    rvw2_result[6] = local_angular_velocity_x_2 * forward[1] + local_angular_velocity_y_2 * forward[0];
+    double test[4];
+    _mm256_storeu_pd(test, velocities);
+    _local_velocity_x_1 = test[0];
+    _local_velocity_y_1 = test[1];
+    _local_velocity_x_2 = test[2];
+    _local_velocity_y_2 = test[3];
+
+    double test_a[4];
+    _mm256_storeu_pd(test, angular);
+    _local_angular_velocity_y_1 = test[0];
+    _local_angular_velocity_x_1 = test[1];
+    _local_angular_velocity_y_2 = test[2];
+    _local_angular_velocity_x_2 = test[3];
 
     MEMORY(4, complete_function, after_loop);
     FLOPS(2, 4, 0, 0, complete_function, after_loop);
-    rvw1_result[4] = local_velocity_x_1 * forward[2] + local_velocity_y_1 * forward[1];
-    rvw2_result[4] = local_velocity_x_2 * forward[2] + local_velocity_y_2 * forward[1];
+    rvw1_result[3] = _local_velocity_x_1 * forward[1] + _local_velocity_y_1 * forward[0];
+    rvw2_result[3] = _local_velocity_x_2 * forward[1] + _local_velocity_y_2 * forward[0];
     FLOPS(2, 4, 0, 0, complete_function, after_loop);
-    rvw1_result[7] = local_angular_velocity_x_1 * forward[2] + local_angular_velocity_y_1 * forward[1];
-    rvw2_result[7] = local_angular_velocity_x_2 * forward[2] + local_angular_velocity_y_2 * forward[1];
+    rvw1_result[6] = _local_angular_velocity_x_1 * forward[1] + _local_angular_velocity_y_1 * forward[0];
+    rvw2_result[6] = _local_angular_velocity_x_2 * forward[1] + _local_angular_velocity_y_2 * forward[0];
+
+    MEMORY(4, complete_function, after_loop);
+    FLOPS(2, 4, 0, 0, complete_function, after_loop);
+    rvw1_result[4] = _local_velocity_x_1 * forward[2] + _local_velocity_y_1 * forward[1];
+    rvw2_result[4] = _local_velocity_x_2 * forward[2] + _local_velocity_y_2 * forward[1];
+    FLOPS(2, 4, 0, 0, complete_function, after_loop);
+    rvw1_result[7] = _local_angular_velocity_x_1 * forward[2] + _local_angular_velocity_y_1 * forward[1];
+    rvw2_result[7] = _local_angular_velocity_x_2 * forward[2] + _local_angular_velocity_y_2 * forward[1];
 
     MEMORY(4, complete_function, after_loop);
     FLOPS(0, 2, 0, 0, complete_function, after_loop);
@@ -2902,5 +2950,4 @@ DLL_EXPORT void simd_collide_balls(double* rvw1, double* rvw2, float R, float M,
 
     END_PROFILE(after_loop);
     END_PROFILE(complete_function);
-    */
 }
