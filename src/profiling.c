@@ -239,7 +239,7 @@ void call_function(const char* name, CollideBallsFn collide_fn) {
         }
 
         Profile profiles[6];
-        //flush_cache(); // Flush the cache before each iteration
+        // flush_cache(); // Flush the cache before each iteration
         for(int j = 0; j < ITERATIONS; j++) {
             //flush_cache(); // Flush the cache before each iteration
             for(int i = 0; i < TEST_CASES; i++) {
@@ -336,6 +336,10 @@ void test_scalar_improvements(void) {
     call_function("Scalar Improvements", scalar_improvements);
 }
 
+void test_scalar_sqrt(void) {
+    call_function("Scalar Less SQRT", scalar_less_sqrt);
+}
+
 void test_collide_balls_simd(void) {
     call_function("SIMD", simd_collide_balls);
 }
@@ -365,6 +369,8 @@ int main() {
         // test_precomp,
         test_less_sqrt,
         test_less_sqrt2,
+        test_scalar_improvements,
+        test_scalar_sqrt,
         // test_branch_prediction,
         // test_remove_unused_branches,
         test_collide_balls_code_motion,

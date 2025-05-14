@@ -43,6 +43,7 @@ color_styles = {
     "SIMD": "orange",
     "Precompute": "gold",
     "Scalar Improvements": "red",
+    "Scalar Less SQRT": "firebrick",
 }
 
 fig, ax = plt.subplots(figsize=(12, 6))  # ✅ This gives both fig and ax
