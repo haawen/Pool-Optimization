@@ -833,6 +833,458 @@ DLL_EXPORT void scalar_less_sqrt(double* rvw1, double* rvw2, float R, float M, f
     END_PROFILE(complete_function);
 }
 
+DLL_EXPORT void approxsq_collide_balls(double* rvw1, double* rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double* rvw1_result, double* rvw2_result, Profile* profiles, Branch* branches)
+{
+    #ifdef PROFILE
+        Profile* complete_function = &profiles[0];
+        Profile* before_loop       = &profiles[1];
+        Profile* impulse           = &profiles[2];
+        Profile* delta             = &profiles[3];
+        Profile* velocity          = &profiles[4];
+        Profile* after_loop        = &profiles[5];
+    #endif
+    START_PROFILE(complete_function);
+    START_PROFILE(before_loop);
+
+    MEMORY(18, complete_function, before_loop);
+    double* translation_1     = get_displacement     (rvw1);
+    double* velocity_1        = get_velocity         (rvw1);
+    double* angular_velocity_1= get_angular_velocity (rvw1);
+
+    double* translation_2     = get_displacement     (rvw2);
+    double* velocity_2        = get_velocity         (rvw2);
+    double* angular_velocity_2= get_angular_velocity (rvw2);
+
+    /* ------------------------------------------------------------------ */
+    /* ----------------------   scalar tweaks   -------------------------- */
+    /* ------------------------------------------------------------------ */
+
+    double invM     = 1.0 / M;           /* division → multiply   */
+    double invR     = 1.0 / R;
+    double C        = 5.0 * invM * invR * 0.5;   /* 5/(2MR) */
+
+    double offset[3];
+    subV3(translation_2, translation_1, offset);
+
+    double offset_mag_sqrd = dotV3(offset, offset);
+    double offset_inv_mag  = 1.0 / sqrt(offset_mag_sqrd);
+    double forward[3];
+    forward[0] = offset[0] * offset_inv_mag;
+    forward[1] = offset[1] * offset_inv_mag;
+    forward[2] = offset[2] * offset_inv_mag;
+
+    double up[3] = {0.0, 0.0, 1.0};
+    double right[3];
+    crossV3(forward, up, right);
+
+    /* ---------------- velocities to local frame ----------------------- */
+    double local_velocity_x_1      = dotV3(velocity_1,  right);
+    double local_velocity_y_1      = dotV3(velocity_1,  forward);
+    double local_velocity_x_2      = dotV3(velocity_2,  right);
+    double local_velocity_y_2      = dotV3(velocity_2,  forward);
+
+    /* --------------- angular velocities to local frame ---------------- */
+    double local_angular_velocity_x_1 = dotV3(angular_velocity_1, right);
+    double local_angular_velocity_y_1 = dotV3(angular_velocity_1, forward);
+    double local_angular_velocity_z_1 = dotV3(angular_velocity_1, up);
+
+    double local_angular_velocity_x_2 = dotV3(angular_velocity_2, right);
+    double local_angular_velocity_y_2 = dotV3(angular_velocity_2, forward);
+    double local_angular_velocity_z_2 = dotV3(angular_velocity_2, up);
+
+    /* ---------------- surface‑velocity helpers (use fma) -------------- */
+    double surface_velocity_x_1 = fma(R, local_angular_velocity_y_1,  local_velocity_x_1);
+    double surface_velocity_y_1 = fma(-R, local_angular_velocity_x_1, local_velocity_y_1);
+    double surface_velocity_x_2 = fma(R, local_angular_velocity_y_2,  local_velocity_x_2);
+    double surface_velocity_y_2 = fma(-R, local_angular_velocity_x_2, local_velocity_y_2);
+
+    /*
+    double surface_velocity_mag1_sq = surface_velocity_x_1*surface_velocity_x_1
+                                    + surface_velocity_y_1*surface_velocity_y_1;
+    double surface_velocity_mag2_sq = surface_velocity_x_2*surface_velocity_x_2
+                                    + surface_velocity_y_2*surface_velocity_y_2;
+    */
+
+    /* ---------------------- contact point slip ------------------------ */
+    double contact_point_velocity_x =  local_velocity_x_1 - local_velocity_x_2
+                                     - R*(local_angular_velocity_z_1 + local_angular_velocity_z_2);
+    double contact_point_velocity_z =  R*(local_angular_velocity_x_1 + local_angular_velocity_x_2);
+    double contact_inv_mag          = 1.0 / sqrt(contact_point_velocity_x*contact_point_velocity_x +
+                                                 contact_point_velocity_z*contact_point_velocity_z);
+    double ball_ball_contact_point_magnitude =
+        1.0 / contact_inv_mag;  /* keep original scalar around for profiling */
+
+    /* --------------------------- impulse step ------------------------- */
+    double velocity_diff_y = local_velocity_y_2 - local_velocity_y_1;
+
+    if (unlikely(deltaP == 0.0f)) {
+        deltaP = 0.5 * (1.0 + e_b) * M * fabs(velocity_diff_y) / (double)N;
+    }
+
+    /* bookkeeping (unchanged) */
+    double total_work      = 0.0;
+    double work_required   = INFINITY;
+    double work_compression= 0.0;
+
+    double deltaP_1 = deltaP, deltaP_2 = deltaP;
+    double deltaP_x_1 = 0, deltaP_y_1 = 0, deltaP_x_2 = 0, deltaP_y_2 = 0;
+
+    END_PROFILE(before_loop);
+    while (velocity_diff_y < 0.0 || total_work < work_required)
+    {
+        /* -------------------- impulse calculation -------------------- */
+        START_PROFILE(impulse);
+
+        if (unlikely(ball_ball_contact_point_magnitude < 1e-16)) {
+            BRANCH(0);
+            deltaP_1 = deltaP_2 = 0.0;
+            deltaP_x_1 = deltaP_y_1 = deltaP_x_2 = deltaP_y_2 = 0.0;
+        } else {
+            BRANCH(1);
+            double inv_mag = contact_inv_mag;          /* already computed */
+            deltaP_1 = -u_b * deltaP * contact_point_velocity_x * inv_mag;
+
+            if (unlikely(fabs(contact_point_velocity_z) < 1e-16)) {
+                BRANCH(2);
+                deltaP_2 = deltaP_x_1 = deltaP_y_1 = deltaP_x_2 = deltaP_y_2 = 0.0;
+            } else {
+                BRANCH(3);
+                deltaP_2 = -u_b * deltaP * contact_point_velocity_z * inv_mag;
+
+                if (deltaP_2 > 0.0) {
+                    BRANCH(4);
+                    deltaP_x_1 = deltaP_y_1 = 0.0;
+
+                    if (unlikely(surface_velocity_x_2 == 0.0 && surface_velocity_y_2 == 0)) {
+                        BRANCH(5);
+                        deltaP_x_2 = deltaP_y_2 = 0.0;
+                    } else {
+                        BRANCH(6);
+                        double inv_sv2 = 1.0 / sqrt(surface_velocity_x_2 * surface_velocity_x_2 + surface_velocity_y_2 * surface_velocity_y_2);
+                        deltaP_x_2 = -u_s2 * surface_velocity_x_2 * inv_sv2 * deltaP_2;
+                        deltaP_y_2 = -u_s2 * surface_velocity_y_2 * inv_sv2 * deltaP_2;
+                    }
+                } else {
+                    BRANCH(7);
+                    deltaP_x_2 = deltaP_y_2 = 0.0;
+                    if (unlikely(surface_velocity_x_1 == 0.0 && surface_velocity_y_1 == 0)) {
+                        BRANCH(8);
+                        deltaP_x_1 = deltaP_y_1 = 0.0;
+                    } else {
+                        BRANCH(9);
+                        double inv_sv1 = 1.0 / sqrt(surface_velocity_x_1*surface_velocity_x_1 + surface_velocity_y_1*surface_velocity_y_1);
+                        deltaP_x_1 = u_s1 * surface_velocity_x_1 * inv_sv1 * deltaP_2;
+                        deltaP_y_1 = u_s1 * surface_velocity_y_1 * inv_sv1 * deltaP_2;
+                    }
+                }
+            }
+        }
+        END_PROFILE(impulse);
+
+        /* ------------------ update linear + angular vel -------------- */
+        START_PROFILE(delta);
+
+        double velocity_change_x_1 = (deltaP_1 + deltaP_x_1) * invM;
+        double velocity_change_y_1 = (-deltaP   + deltaP_y_1) * invM;
+        double velocity_change_x_2 = (-deltaP_1 + deltaP_x_2) * invM;
+        double velocity_change_y_2 = ( deltaP   + deltaP_y_2) * invM;
+
+        local_velocity_x_1 += velocity_change_x_1;
+        local_velocity_y_1 += velocity_change_y_1;
+        local_velocity_x_2 += velocity_change_x_2;
+        local_velocity_y_2 += velocity_change_y_2;
+
+        /* angular */
+        local_angular_velocity_x_1 += C * (deltaP_2 + deltaP_y_1);
+        local_angular_velocity_y_1 += C * (-deltaP_x_1);
+        local_angular_velocity_z_1 += C * (-deltaP_1);
+
+        local_angular_velocity_x_2 += C * (deltaP_2 + deltaP_y_2);
+        local_angular_velocity_y_2 += C * (-deltaP_x_2);
+        local_angular_velocity_z_2 += C * (-deltaP_1);
+
+        END_PROFILE(delta);
+
+        /* ----------------- recompute helpers for next iter ----------- */
+        START_PROFILE(velocity);
+
+        surface_velocity_x_1 = fma(R,  local_angular_velocity_y_1,  local_velocity_x_1);
+        surface_velocity_y_1 = fma(-R, local_angular_velocity_x_1,  local_velocity_y_1);
+        surface_velocity_x_2 = fma(R,  local_angular_velocity_y_2,  local_velocity_x_2);
+        surface_velocity_y_2 = fma(-R, local_angular_velocity_x_2,  local_velocity_y_2);
+
+        /*
+        surface_velocity_mag1_sq = surface_velocity_x_1*surface_velocity_x_1
+                                + surface_velocity_y_1*surface_velocity_y_1;
+        surface_velocity_mag2_sq = surface_velocity_x_2*surface_velocity_x_2
+                                + surface_velocity_y_2*surface_velocity_y_2;
+        */
+
+        contact_point_velocity_x = local_velocity_x_1 - local_velocity_x_2
+                                 - (local_angular_velocity_z_1 + local_angular_velocity_z_2)*R;
+        contact_point_velocity_z = (local_angular_velocity_x_1 + local_angular_velocity_x_2)*R;
+        contact_inv_mag          *= 0.5 * (3.0 - (contact_point_velocity_x * contact_point_velocity_x +
+                               contact_point_velocity_z * contact_point_velocity_z) * contact_inv_mag * contact_inv_mag);
+        ball_ball_contact_point_magnitude = 1.0 / contact_inv_mag;   /* for branch test */
+
+        /* work / compression bookkeeping (unchanged) */
+        double velocity_diff_y_prev = velocity_diff_y;
+        velocity_diff_y   = local_velocity_y_2 - local_velocity_y_1;
+        total_work       += 0.5 * deltaP * fabs(velocity_diff_y_prev + velocity_diff_y);
+
+        if (work_compression == 0.0 && velocity_diff_y > 0.0) {
+            work_compression = total_work;
+            work_required    = (1.0 + e_b * e_b) * work_compression;
+        }
+
+        END_PROFILE(velocity);
+    }
+    /* ------------------------------------------------------------------ */
+    /* ---------------------- epilogue – UNCHANGED ----------------------- */
+    /* ------------------------------------------------------------------ */
+    START_PROFILE(after_loop);
+    for (int i = 0; i < 3; ++i) {
+        rvw1_result[i+3] = local_velocity_x_1*right[i] + local_velocity_y_1*forward[i];
+        rvw2_result[i+3] = local_velocity_x_2*right[i] + local_velocity_y_2*forward[i];
+
+        if (i < 2) {
+            rvw1_result[i+6] = local_angular_velocity_x_1*right[i] + local_angular_velocity_y_1*forward[i];
+            rvw2_result[i+6] = local_angular_velocity_x_2*right[i] + local_angular_velocity_y_2*forward[i];
+        } else {
+            rvw1_result[i+6] = local_angular_velocity_z_1;
+            rvw2_result[i+6] = local_angular_velocity_z_2;
+        }
+    }
+    END_PROFILE(after_loop);
+    END_PROFILE(complete_function);
+}
+
+DLL_EXPORT void approx_symmetry(double* rvw1, double* rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double* rvw1_result, double* rvw2_result, Profile* profiles, Branch* branches)
+{
+    #ifdef PROFILE
+        Profile* complete_function = &profiles[0];
+        Profile* before_loop       = &profiles[1];
+        Profile* impulse           = &profiles[2];
+        Profile* delta             = &profiles[3];
+        Profile* velocity          = &profiles[4];
+        Profile* after_loop        = &profiles[5];
+    #endif
+    START_PROFILE(complete_function);
+    START_PROFILE(before_loop);
+
+    MEMORY(18, complete_function, before_loop);
+    double* translation_1     = get_displacement     (rvw1);
+    double* velocity_1        = get_velocity         (rvw1);
+    double* angular_velocity_1= get_angular_velocity (rvw1);
+
+    double* translation_2     = get_displacement     (rvw2);
+    double* velocity_2        = get_velocity         (rvw2);
+    double* angular_velocity_2= get_angular_velocity (rvw2);
+
+    /* ------------------------------------------------------------------ */
+    /* ----------------------   scalar tweaks   -------------------------- */
+    /* ------------------------------------------------------------------ */
+
+    double invM     = 1.0 / M;           /* division → multiply   */
+    double invR     = 1.0 / R;
+    double C        = 5.0 * invM * invR * 0.5;   /* 5/(2MR) */
+
+    double offset[3];
+    subV3(translation_2, translation_1, offset);
+
+    double offset_mag_sqrd = dotV3(offset, offset);
+    double offset_inv_mag  = 1.0 / sqrt(offset_mag_sqrd);
+    double forward[3];
+    forward[0] = offset[0] * offset_inv_mag;
+    forward[1] = offset[1] * offset_inv_mag;
+    forward[2] = offset[2] * offset_inv_mag;
+
+    double up[3] = {0.0, 0.0, 1.0};
+    double right[3];
+    crossV3(forward, up, right);
+
+    /* ---------------- velocities to local frame ----------------------- */
+    double local_velocity_x_1      = dotV3(velocity_1,  right);
+    double local_velocity_y_1      = dotV3(velocity_1,  forward);
+    double local_velocity_x_2      = dotV3(velocity_2,  right);
+    double local_velocity_y_2      = dotV3(velocity_2,  forward);
+
+    /* --------------- angular velocities to local frame ---------------- */
+    double local_angular_velocity_x_1 = dotV3(angular_velocity_1, right);
+    double local_angular_velocity_y_1 = dotV3(angular_velocity_1, forward);
+    double local_angular_velocity_z_1 = dotV3(angular_velocity_1, up);
+
+    double local_angular_velocity_x_2 = dotV3(angular_velocity_2, right);
+    double local_angular_velocity_y_2 = dotV3(angular_velocity_2, forward);
+    double local_angular_velocity_z_2 = dotV3(angular_velocity_2, up);
+
+    /* ---------------- surface‑velocity helpers (use fma) -------------- */
+    double surface_velocity_x_1 = fma(R, local_angular_velocity_y_1,  local_velocity_x_1);
+    double surface_velocity_y_1 = fma(-R, local_angular_velocity_x_1, local_velocity_y_1);
+    double surface_velocity_x_2 = fma(R, local_angular_velocity_y_2,  local_velocity_x_2);
+    double surface_velocity_y_2 = fma(-R, local_angular_velocity_x_2, local_velocity_y_2);
+
+    /*
+    double surface_velocity_mag1_sq = surface_velocity_x_1*surface_velocity_x_1
+                                    + surface_velocity_y_1*surface_velocity_y_1;
+    double surface_velocity_mag2_sq = surface_velocity_x_2*surface_velocity_x_2
+                                    + surface_velocity_y_2*surface_velocity_y_2;
+    */
+
+    /* ---------------------- contact point slip ------------------------ */
+    double contact_point_velocity_x =  local_velocity_x_1 - local_velocity_x_2
+                                     - R*(local_angular_velocity_z_1 + local_angular_velocity_z_2);
+    double contact_point_velocity_z =  R*(local_angular_velocity_x_1 + local_angular_velocity_x_2);
+    double contact_inv_mag          = 1.0 / sqrt(contact_point_velocity_x*contact_point_velocity_x +
+                                                 contact_point_velocity_z*contact_point_velocity_z);
+    double ball_ball_contact_point_magnitude =
+        1.0 / contact_inv_mag;  /* keep original scalar around for profiling */
+
+    /* --------------------------- impulse step ------------------------- */
+    double velocity_diff_y = local_velocity_y_2 - local_velocity_y_1;
+
+    if (unlikely(deltaP == 0.0f)) {
+        deltaP = 0.5 * (1.0 + e_b) * M * fabs(velocity_diff_y) / (double)N;
+    }
+
+    /* bookkeeping (unchanged) */
+    double total_work      = 0.0;
+    double work_required   = INFINITY;
+    double work_compression= 0.0;
+
+    double deltaP_1 = deltaP, deltaP_2 = deltaP;
+    double deltaP_x_1 = 0, deltaP_y_1 = 0, deltaP_x_2 = 0, deltaP_y_2 = 0;
+
+    END_PROFILE(before_loop);
+    while (velocity_diff_y < 0.0 || total_work < work_required)
+    {
+        /* -------------------- impulse calculation -------------------- */
+        START_PROFILE(impulse);
+
+        if (unlikely(ball_ball_contact_point_magnitude < 1e-16)) {
+            BRANCH(0);
+            deltaP_1 = deltaP_2 = 0.0;
+            deltaP_x_1 = deltaP_y_1 = deltaP_x_2 = deltaP_y_2 = 0.0;
+        } else {
+            BRANCH(1);
+            double inv_mag = contact_inv_mag;          /* already computed */
+            deltaP_1 = -u_b * deltaP * contact_point_velocity_x * inv_mag;
+
+            if (unlikely(fabs(contact_point_velocity_z) < 1e-16)) {
+                BRANCH(2);
+                deltaP_2 = deltaP_x_1 = deltaP_y_1 = deltaP_x_2 = deltaP_y_2 = 0.0;
+            } else {
+                BRANCH(3);
+                deltaP_2 = -u_b * deltaP * contact_point_velocity_z * inv_mag;
+
+                if (deltaP_2 > 0.0) {
+                    BRANCH(4);
+                    deltaP_x_1 = deltaP_y_1 = 0.0;
+
+                    if (unlikely(surface_velocity_x_2 == 0.0 && surface_velocity_y_2 == 0)) {
+                        BRANCH(5);
+                        deltaP_x_2 = deltaP_y_2 = 0.0;
+                    } else {
+                        BRANCH(6);
+                        double inv_sv2 = 1.0 / sqrt(surface_velocity_x_2 * surface_velocity_x_2 + surface_velocity_y_2 * surface_velocity_y_2);
+                        deltaP_x_2 = -u_s2 * surface_velocity_x_2 * inv_sv2 * deltaP_2;
+                        deltaP_y_2 = -u_s2 * surface_velocity_y_2 * inv_sv2 * deltaP_2;
+                    }
+                } else {
+                    BRANCH(7);
+                    deltaP_x_2 = deltaP_y_2 = 0.0;
+                    if (unlikely(surface_velocity_x_1 == 0.0 && surface_velocity_y_1 == 0)) {
+                        BRANCH(8);
+                        deltaP_x_1 = deltaP_y_1 = 0.0;
+                    } else {
+                        BRANCH(9);
+                        double inv_sv1 = 1.0 / sqrt(surface_velocity_x_1*surface_velocity_x_1 + surface_velocity_y_1*surface_velocity_y_1);
+                        deltaP_x_1 = u_s1 * surface_velocity_x_1 * inv_sv1 * deltaP_2;
+                        deltaP_y_1 = u_s1 * surface_velocity_y_1 * inv_sv1 * deltaP_2;
+                    }
+                }
+            }
+        }
+        END_PROFILE(impulse);
+
+        /* ------------------ update linear + angular vel -------------- */
+        START_PROFILE(delta);
+
+        double velocity_change_x_1 = (deltaP_1 + deltaP_x_1) * invM;
+        double velocity_change_y_1 = (-deltaP   + deltaP_y_1) * invM;
+        double velocity_change_x_2 = (-deltaP_1 + deltaP_x_2) * invM;
+        double velocity_change_y_2 = ( deltaP   + deltaP_y_2) * invM;
+
+        local_velocity_x_1 += velocity_change_x_1;
+        local_velocity_y_1 += velocity_change_y_1;
+        local_velocity_x_2 += velocity_change_x_2;
+        local_velocity_y_2 += velocity_change_y_2;
+
+        /* angular */
+        local_angular_velocity_x_1 += C * (deltaP_2 + deltaP_y_1);
+        local_angular_velocity_y_1 += C * (-deltaP_x_1);
+        local_angular_velocity_z_1 += C * (-deltaP_1);
+
+        local_angular_velocity_x_2 += C * (deltaP_2 + deltaP_y_2);
+        local_angular_velocity_y_2 += C * (-deltaP_x_2);
+        local_angular_velocity_z_2 += C * (-deltaP_1);
+
+        END_PROFILE(delta);
+
+        /* ----------------- recompute helpers for next iter ----------- */
+        START_PROFILE(velocity);
+
+        surface_velocity_x_1 = fma(R,  local_angular_velocity_y_1,  local_velocity_x_1);
+        surface_velocity_y_1 = fma(-R, local_angular_velocity_x_1,  local_velocity_y_1);
+        surface_velocity_x_2 = fma(R,  local_angular_velocity_y_2,  local_velocity_x_2);
+        surface_velocity_y_2 = fma(-R, local_angular_velocity_x_2,  local_velocity_y_2);
+
+        /*
+        surface_velocity_mag1_sq = surface_velocity_x_1*surface_velocity_x_1
+                                + surface_velocity_y_1*surface_velocity_y_1;
+        surface_velocity_mag2_sq = surface_velocity_x_2*surface_velocity_x_2
+                                + surface_velocity_y_2*surface_velocity_y_2;
+        */
+
+        contact_point_velocity_x = local_velocity_x_1 - local_velocity_x_2
+                                 - (local_angular_velocity_z_1 + local_angular_velocity_z_2)*R;
+        contact_point_velocity_z = (local_angular_velocity_x_1 + local_angular_velocity_x_2)*R;
+        contact_inv_mag          *= 0.5 * (3.0 - (contact_point_velocity_x * contact_point_velocity_x +
+                               contact_point_velocity_z * contact_point_velocity_z) * contact_inv_mag * contact_inv_mag);
+        ball_ball_contact_point_magnitude = 1.0 / contact_inv_mag;   /* for branch test */
+
+        /* work / compression bookkeeping (unchanged) */
+        double velocity_diff_y_prev = velocity_diff_y;
+        velocity_diff_y   = local_velocity_y_2 - local_velocity_y_1;
+        total_work       += 0.5 * deltaP * fabs(velocity_diff_y_prev + velocity_diff_y);
+
+        if (work_compression == 0.0 && velocity_diff_y > 0.0) {
+            work_compression = total_work;
+            work_required    = (1.0 + e_b * e_b) * work_compression;
+        }
+
+        END_PROFILE(velocity);
+    }
+    /* ------------------------------------------------------------------ */
+    /* ---------------------- epilogue – UNCHANGED ----------------------- */
+    /* ------------------------------------------------------------------ */
+    START_PROFILE(after_loop);
+    for (int i = 0; i < 3; ++i) {
+        rvw1_result[i+3] = local_velocity_x_1*right[i] + local_velocity_y_1*forward[i];
+        rvw2_result[i+3] = local_velocity_x_2*right[i] + local_velocity_y_2*forward[i];
+
+        if (i < 2) {
+            rvw1_result[i+6] = local_angular_velocity_x_1*right[i] + local_angular_velocity_y_1*forward[i];
+            rvw2_result[i+6] = local_angular_velocity_x_2*right[i] + local_angular_velocity_y_2*forward[i];
+        } else {
+            rvw1_result[i+6] = local_angular_velocity_z_1;
+            rvw2_result[i+6] = local_angular_velocity_z_2;
+        }
+    }
+    END_PROFILE(after_loop);
+    END_PROFILE(complete_function);
+}
+
 DLL_EXPORT void simple_precompute_cb(double* rvw1, double* rvw2, float Rf, float Mf, float u_s1f, float u_s2f, float u_bf, float e_bf, float deltaPf, int N, double* rvw1_result, double* rvw2_result, Profile* profiles, Branch* branches) {
 
     #ifdef PROFILE

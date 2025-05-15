@@ -24,10 +24,9 @@ set(FLAGS
     -Wall
     -pedantic
     -mfma
-    -fno-math-errno
+    #-fno-math-errno
     #-mavx2          # We dont do SIMD yet
-
-    -funroll-loops
+    #-funroll-loops
 
     -ftree-vectorize
     #-flto          # Worsens

@@ -339,10 +339,17 @@ void test_scalar_improvements(void) {
 void test_scalar_sqrt(void) {
     call_function("Scalar Less SQRT", scalar_less_sqrt);
 }
+void test_approx_sqrt(void) {
+    call_function("scalar Less SQRT + Approx", approxsq_collide_balls);
+}
+void test_approx_symmetry(void) {
+    call_function("Approx + Symmetry", approx_symmetry);
+}
 
 void test_collide_balls_simd(void) {
     call_function("SIMD", simd_collide_balls);
 }
+
 
 int main() {
     #ifdef _WIN32
@@ -371,6 +378,7 @@ int main() {
         test_less_sqrt2,
         test_scalar_improvements,
         test_scalar_sqrt,
+        test_approx_sqrt,
         // test_branch_prediction,
         // test_remove_unused_branches,
         test_collide_balls_code_motion,

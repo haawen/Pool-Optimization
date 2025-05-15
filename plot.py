@@ -44,6 +44,8 @@ color_styles = {
     "Precompute": "gold",
     "Scalar Improvements": "red",
     "Scalar Less SQRT": "firebrick",
+    "scalar Less SQRT + Approx": "Cyan",
+    "Approx + Symmetry": "DarkOrange",
 }
 
 fig, ax = plt.subplots(figsize=(12, 6))  # ✅ This gives both fig and ax
