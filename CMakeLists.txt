@@ -18,17 +18,21 @@ set(SOURCES
 )
 
 set(FLAGS
-    -Ofast
-    -ffast-math
-    #-march=native # unpredictable, most of the times worsens
-    -Wall
-    -pedantic
+    -O3
     -mfma
-    #-fno-math-errno
-    #-mavx2          # We dont do SIMD yet
-    #-funroll-loops
+    -mavx2
+    # -Ofast
+    # -ffast-math
+    # #-march=native # unpredictable, most of the times worsens
+    # -Wall
+    # -pedantic
+    # -mfma
+    # -fno-math-errno
+    # #-mavx2          # We dont do SIMD yet
 
-    -ftree-vectorize
+    # -funroll-loops
+
+    # -ftree-vectorize
     #-flto          # Worsens
 )
 

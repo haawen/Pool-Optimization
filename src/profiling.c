@@ -5,9 +5,9 @@
 #include "unity.h"
 #include "pool.h"
 
-#define WARMUP 100
-#define ITERATIONS 10000
-#define TEST_RUNNER_ITERATIONS 10 // Rerun all TestCases (so warmup + iterations) in Random Order
+#define WARMUP 0
+#define ITERATIONS 1
+#define TEST_RUNNER_ITERATIONS 1 // Rerun all TestCases (so warmup + iterations) in Random Order
 #define FLUSH_SIZE (32 * 1024 * 1024)  // 32MB buffer
 
 #ifdef PROFILE
@@ -374,14 +374,13 @@ int main() {
     void (*tests[])(void) = {
         test_collide_balls_basic,
         // test_precomp,
-        test_less_sqrt,
-        test_less_sqrt2,
-        test_scalar_improvements,
-        test_scalar_sqrt,
-        test_approx_sqrt,
+        // test_less_sqrt,
+        // test_less_sqrt2,
+        // test_scalar_improvements,
+        // test_scalar_sqrt,
         // test_branch_prediction,
         // test_remove_unused_branches,
-        test_collide_balls_code_motion,
+        // test_collide_balls_code_motion,
         test_collide_balls_simd,
     };
 
@@ -392,6 +391,7 @@ int main() {
 
         for(int i = 0; i < TEST_RUNNER_ITERATIONS; i++) {
 
+            /*
 
              // Fisher–Yates shuffle
             for (int i = num_tests - 1; i > 0; i--) {
@@ -400,6 +400,8 @@ int main() {
                 tests[i] = tests[j];
                 tests[j] = tmp;
             }
+
+            */
 
             for (int i = 0; i < num_tests; i++) {
                 RUN_TEST(tests[i]);
