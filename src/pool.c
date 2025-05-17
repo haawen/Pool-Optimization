@@ -1,6 +1,7 @@
 #include "pool.h"
 #include "math_helper.h"
 
+#include <emmintrin.h>
 #include <immintrin.h>
 #include <smmintrin.h>
 #include <stdio.h>
@@ -3394,6 +3395,7 @@ DLL_EXPORT void simd_collide_balls(double* rvw1, double* rvw2, float R, float M,
     FLOPS(0, 2, 1, 0, complete_function, before_loop);
     double C = 5.0 / (2.0 * M * R);
     __m256d C4 = _mm256_set1_pd(C);
+    __m256d NC4 = _mm256_set1_pd(-C);
 
     double total_work = 0; // Work done due to impulse force
     double work_required = INFINITY; // Total amount of work required before collision handling is complete
@@ -3465,36 +3467,6 @@ DLL_EXPORT void simd_collide_balls(double* rvw1, double* rvw2, float R, float M,
         // [surf 1 magnitude, contact point magnitude, surf 2 magnitude]
         __m256d sqrts = _mm256_sqrt_pd(surf_sqrd);
 
-        double test_sqrt[4];
-        _mm256_storeu_pd(test_sqrt, sqrts);
-
-        double ball_ball_contact_point_magnitude = test_sqrt[1];
-        double surface_velocity_magnitude_1 = test_sqrt[0];
-        double surface_velocity_magnitude_2 = test_sqrt[2];
-
-        double angz[4];
-        _mm256_storeu_pd(angz, angular_z);
-        _local_angular_velocity_z_1 = angz[2];
-        _local_angular_velocity_z_2 = angz[3];
-
-
-        double contvel[4];
-        _mm256_storeu_pd(contvel, contact_point);
-        double contact_point_velocity_x = contvel[0];
-        double contact_point_velocity_z = contvel[1];
-
-        double surf[4];
-        _mm256_storeu_pd(surf, surface_velocities);
-        double surfx1 = surf[0];
-        double surfy1 = surf[1];
-        double surfx2 = surf[2];
-        double surfy2 = surf[3];
-
-        // printf("1 %lf %lf %lf\n", surface_velocity_magnitude_1, ball_ball_contact_point_magnitude, surface_velocity_magnitude_2);
-        // printf("1 %lf %lf \n", contact_point_velocity_x, contact_point_velocity_z);
-        // printf("1 %lf %lf %lf %lf \n", surfx1, surfy1, surfx2, surfy2);
-        // printf("1 %lf %lf \n", _local_angular_velocity_z_1, _local_angular_velocity_z_2);
-
         BRANCH(11);
         START_PROFILE(impulse);
 
@@ -3503,109 +3475,79 @@ DLL_EXPORT void simd_collide_balls(double* rvw1, double* rvw2, float R, float M,
         // [deltaP_1, deltaP_2, undef, undef]
         deltaP_12 =  _mm256_mul_pd(nub4, _mm256_mul_pd(deltaP4, deltaP_12));
 
-        double deltaTest[4];
-        _mm256_storeu_pd(deltaTest, deltaP_12);
-
-        deltaP_1 = deltaTest[0];// -u_b * deltaP * contact_point_velocity_x / ball_ball_contact_point_magnitude;
-        deltaP_2 = deltaTest[1];// -u_b * deltaP * contact_point_velocity_z / ball_ball_contact_point_magnitude;
-
         __m256d surf_norm = _mm256_div_pd(surface_velocities, _mm256_shuffle_pd(sqrts, sqrts, 0b0000));
 
         __m256d u_s4 = _mm256_set_pd(-u_s2, -u_s2, u_s1, u_s1);
 
+        // [deltaP_2 * 4]
+        __m256d deltaP_2_4 = _mm256_permute4x64_pd(deltaP_12, 0b01010101);
         // [deltaP_x_1, deltaP_y_1, deltaP_x_2, deltaP_y_2]
-        __m256d deltaP_xy12 = _mm256_mul_pd(u_s4, _mm256_mul_pd(surf_norm, _mm256_permute4x64_pd(deltaP_12, 0b01010101)));
+        __m256d deltaP_xy12 = _mm256_mul_pd(u_s4, _mm256_mul_pd(surf_norm, deltaP_2_4));
 
-        _mm256_storeu_pd(deltaTest, deltaP_xy12);
-        deltaP_x_2 = deltaTest[2];// -u_s2 * (surfx2 / surface_velocity_magnitude_2) * deltaP_2;
-        deltaP_y_2 = deltaTest[3];// -u_s2 * (surfy2 / surface_velocity_magnitude_2) * deltaP_2;
+        // _mm256_set_pd(0.0, deltaP_2_4, fabs(contact_point_velocity_z), ball_ball_contact_point_magnitude);
+        __m256d impulse_rhs = _mm256_setzero_pd();
+        impulse_rhs = _mm256_blend_pd(impulse_rhs, deltaP_2_4, 0b0100);
 
-        deltaP_x_1 = deltaTest[0]; // u_s1 * (surfx1 / surface_velocity_magnitude_1) * deltaP_2;
-        deltaP_y_1 = deltaTest[1]; // u_s1 * (surfy1 / surface_velocity_magnitude_1) * deltaP_2;
+        // fabs
+        __m256d abs_mask = _mm256_castsi256_pd(_mm256_set1_epi64x(0x7FFFFFFFFFFFFFFF));
+        __m256d abs_contact = _mm256_and_pd(contact_point, abs_mask);
+        impulse_rhs = _mm256_blend_pd(impulse_rhs, abs_contact, 0b0010);
+        impulse_rhs = _mm256_blend_pd(impulse_rhs, _mm256_shuffle_pd(sqrts, sqrts, 0b0011), 0b0001);
 
-        // Impulse Calculation
-        if (__builtin_expect(ball_ball_contact_point_magnitude < 1e-16, false)) {
-            BRANCH(0);
-            deltaP_1 = 0;
-            deltaP_2 = 0;
-            deltaP_x_1 = 0;
-            deltaP_y_1 = 0;
-            deltaP_x_2 = 0;
-            deltaP_y_2 = 0;
-        } else {
-            BRANCH(1);
-            FLOPS(1, 2, 1, 0, complete_function, impulse);
-            // deltaP_1 = -u_b * deltaP * contact_point_velocity_x / ball_ball_contact_point_magnitude;
 
-            if(__builtin_expect(fabs(contact_point_velocity_z) < 1e-16, false)) {
-                BRANCH(2);
-                deltaP_2 = 0;
-                deltaP_x_1 = 0;
-                deltaP_y_1 = 0;
-                deltaP_x_2 = 0;
-                deltaP_y_2 = 0;
-            } else {
+        // _mm256_set_pd(0.0, 0.0, 1e-16, 1e-16);
+        __m256d impulse_lhs = _mm256_set_pd(0.0, 0.0, 1e-16, 1e-16);
 
-                BRANCH(3);
-                FLOPS(1, 2, 1, 0, complete_function, impulse);
-                // deltaP_2 = -u_b * deltaP * contact_point_velocity_z / ball_ball_contact_point_magnitude;
+        // [ball_ball_contact_point_magnitude > 1e-16, fabs(contact_point_velocity_z) > 1e-16, deltaP_2 > 0, undef]
+        __m256d impulse_mask = _mm256_cmp_pd(impulse_lhs, impulse_rhs, _CMP_LT_OQ);
+        // [surface_vel_mag1 != 0, undef, surface_vel_mag2 != 0, undef]
+        __m256d impulse_mask_2 = _mm256_cmp_pd(sqrts, _mm256_setzero_pd(), _CMP_NEQ_OQ);
+        // [surface_vel_mag1 != 0 ** 2, surface_vel_mag2 != 0**2]
+        impulse_mask_2 = _mm256_shuffle_pd(impulse_mask_2, impulse_mask_2, 0b0000);
 
-                if(deltaP_2 > 0) {
-                    BRANCH(4);
-                    deltaP_x_1 = 0;
-                    deltaP_y_1 = 0;
+        // Expensive part? 9 cycles...
+        __m256d contact_mag_mask = _mm256_permute4x64_pd(impulse_mask, 0b00000000);
+        __m256d contact_z_mask = _mm256_permute4x64_pd(impulse_mask, 0b01010101);
+        __m256d deltaP_2_mask = _mm256_permute4x64_pd(impulse_mask, 0b10101010);
 
-                    // TODO: probably best to check for some tolerance
-                    if(__builtin_expect(surfx2 == 0.0 && surfy2 == 0.0, false)) {
-                        BRANCH(5);
-                        deltaP_x_2 = 0;
-                        deltaP_y_2 = 0;
-                    } else {
-                        BRANCH(6);
-                        FLOPS(2, 4, 2, 1, complete_function, impulse);
-                        // deltaP_x_2 = -u_s2 * (surfx2 / surface_velocity_magnitude_2) * deltaP_2;
-                        // deltaP_y_2 = -u_s2 * (surfy2 / surface_velocity_magnitude_2) * deltaP_2;
-                    }
-                } else {
-                    BRANCH(7);
-                    deltaP_x_2 = 0;
-                    deltaP_y_2 = 0;
-                    if(__builtin_expect(surfx1 == 0.0 && surfy1 == 0.0, false)) {
-                        BRANCH(8);
-                        deltaP_x_1 = 0;
-                        deltaP_y_1 = 0;
-                    } else {
-                        BRANCH(9);
-                        FLOPS(0, 4, 2, 1, complete_function, impulse);
-                        // deltaP_x_1 = u_s1 * (surfx1 / surface_velocity_magnitude_1) * deltaP_2;
-                        // deltaP_y_1 = u_s1 * (surfy1 / surface_velocity_magnitude_1) * deltaP_2;
-                    }
-                }
+        __m256d flip_mask = _mm256_castsi256_pd(_mm256_set_epi64x(0, 0, 0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF));
+        // [deltaP_2 <= 0, deltaP_2 <= 0, deltaP_2 > 0, deltaP_2 > 0]
+        deltaP_2_mask = _mm256_xor_pd(deltaP_2_mask, flip_mask);
 
-            }
-        }
+        __m256d deltaP_xy_12_mask = _mm256_and_pd(_mm256_and_pd(deltaP_2_mask, impulse_mask_2), _mm256_and_pd(contact_mag_mask, contact_z_mask)) ;
+        deltaP_xy12 = _mm256_and_pd(deltaP_xy12, deltaP_xy_12_mask);
 
-        // TODO is delta my inconsistency or what??
-
-        // printf("1 %f %lf %lf %lf %lf %lf %lf\n", deltaP, deltaP_1, deltaP_2, deltaP_x_1, deltaP_y_1, deltaP_x_2, deltaP_y_2);
-        // break;
+        deltaP_12 = _mm256_and_pd(deltaP_12, contact_mag_mask);
+        __m256d deltaP_12_mask = _mm256_castsi256_pd(_mm256_set_epi64x(0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF, 0, 0xFFFFFFFFFFFFFFFF));
+        deltaP_12 = _mm256_and_pd(deltaP_12, _mm256_or_pd(contact_z_mask, deltaP_12_mask));
 
         END_PROFILE(impulse);
         START_PROFILE(delta);
 
         FLOPS(6, 0, 4, 0, complete_function, delta);
+
+        // deltaP_12 [deltaP_1, deltaP_2]
+        // deltaP_xy12 [deltaP_x_1, deltaP_y_1, deltaP_x_2, deltaP_y_2]
+
         // Velocity changes
-        __m256d delta_velocites = _mm256_set_pd(deltaP + deltaP_y_2, -deltaP_1 + deltaP_x_2, -deltaP + deltaP_y_1, deltaP_1 + deltaP_x_1);
+        __m256d deltaP_1_4 = _mm256_permute4x64_pd(deltaP_12, 0);
+        // [deltaP_1, deltaP_1, deltaP_2 deltaP_2]
+        __m256d deltaP1_deltaP_x1 = _mm256_blend_pd(deltaP4, deltaP_1_4, 0b0101);
+        __m256d delta_velocites = _mm256_fmadd_pd(_mm256_set_pd(1.0, -1.0, -1.0, 1.0), deltaP1_deltaP_x1, deltaP_xy12);
         velocities = _mm256_add_pd(velocities, _mm256_div_pd(delta_velocites, M4));
 
         FLOPS(6, 6, 0, 0, complete_function, delta);
 
         // [y1, x1, y2, x2] !!! ! Y is first such that we can skip reorderring before surface calculation
-        __m256d delta_angular = _mm256_set_pd(deltaP_2 + deltaP_y_2, -deltaP_x_2, deltaP_2 + deltaP_y_1, -deltaP_x_1);
+        // cant reuse previous, because it may have been set to 0 in rare cases
+        deltaP_2_4 = _mm256_permute4x64_pd(deltaP_12, 0b01010101);
+        __m256d deltaP_2_0 = _mm256_blend_pd(deltaP_2_4, _mm256_setzero_pd(), 0b0101);
+        __m256d delta_angular = _mm256_fmadd_pd(_mm256_set_pd(1.0, -1.0, 1.0, -1.0), deltaP_xy12, deltaP_2_0);
+        // __m256d delta_angular = _mm256_set_pd(deltaP_2 + deltaP_y_2, -deltaP_x_2, deltaP_2 + deltaP_y_1, -deltaP_x_1);
         angular = _mm256_fmadd_pd(C4, delta_angular, angular);
 
         FLOPS(6, 0, 0, 0, complete_function, delta);
-        angular_z = _mm256_fmadd_pd(C4, _mm256_set1_pd(-deltaP_1), angular_z);
+        angular_z = _mm256_fmadd_pd(NC4, deltaP_1_4, angular_z);
 
         END_PROFILE(delta);
         START_PROFILE(velocity);
