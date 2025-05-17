@@ -22,17 +22,17 @@ set(FLAGS
     -mfma
     -mavx2
     # -Ofast
-    # -ffast-math
+    -ffast-math
     # #-march=native # unpredictable, most of the times worsens
     # -Wall
     # -pedantic
     # -mfma
-    # -fno-math-errno
+    -fno-math-errno
     # #-mavx2          # We dont do SIMD yet
 
-    # -funroll-loops
+    -funroll-loops
 
-    # -ftree-vectorize
+    -ftree-vectorize
     #-flto          # Worsens
 )
 
