@@ -3378,21 +3378,16 @@ DLL_EXPORT void simd_collide_balls(double* rvw1, double* rvw2, float R, float M,
     //printf("\nC Contact Point Slide, Spin:\n");
     //printf("  Contact Point: u_ijC_xz_mag= %.6f\n", ball_ball_contact_point_magnitude);
 
-    // Main collision loop
-    FLOPS(1, 0, 0, 0, complete_function, before_loop);
-    double velocity_diff_y = _local_velocity_y_2 - _local_velocity_y_1;
-
     // deltaP is most likely always 0?
     // ΔP represents the Impulse during a time of Δt
+    double velocity_diff_y = _local_velocity_y_2 - _local_velocity_y_1;
     if (deltaP == 0) {
-        FLOPS(0, 4, 1, 0, complete_function, before_loop);
         deltaP = 0.5 * (1.0 + e_b) * M * fabs(velocity_diff_y) / (double)(N);
     }
 
     __m256d deltaP4 = _mm256_set1_pd(deltaP);
     __m256d nub4 = _mm256_set1_pd(-u_b);
 
-    FLOPS(0, 2, 1, 0, complete_function, before_loop);
     double C = 5.0 / (2.0 * M * R);
     __m256d C4 = _mm256_set1_pd(C);
     __m256d NC4 = _mm256_set1_pd(-C);
@@ -3401,26 +3396,11 @@ DLL_EXPORT void simd_collide_balls(double* rvw1, double* rvw2, float R, float M,
     double work_required = INFINITY; // Total amount of work required before collision handling is complete
     double work_compression = 0;
 
-    // TODO: better naming for deltas
-    // Delta impulse overall per ball?
-    double deltaP_1 = deltaP;
-    double deltaP_2 = deltaP;
-
-    // Impulse per axis per ball
-    double deltaP_x_1 = 0;
-    double deltaP_y_1 = 0;
-    double deltaP_x_2 = 0;
-    double deltaP_y_2 = 0;
-
-    __m256d loop_cond_rhs = _mm256_set_pd(0.0, 0.0, work_required, 0.0);
-    __m256d loop_cond_lhs = _mm256_set_pd(0.0, 0.0, total_work, velocity_diff_y);
-    __m256d cmp = _mm256_cmp_pd(loop_cond_lhs, loop_cond_rhs, _CMP_LT_OQ);
-    int mask = _mm256_movemask_pd(cmp);
-
     END_PROFILE(before_loop);
 
     // while (__builtin_expect(velocity_diff_y < 0 || total_work < work_required, true)) {
-    while (__builtin_expect(mask != 0, true)) {
+
+    while (__builtin_expect(velocity_diff_y < 0 || total_work < work_required, true)) {
 
         //[x1, wx1, x2, wx2]
         __m256d lower = _mm256_blend_pd(velocities, angular,  0b1010);
@@ -3526,9 +3506,6 @@ DLL_EXPORT void simd_collide_balls(double* rvw1, double* rvw2, float R, float M,
 
         FLOPS(6, 0, 4, 0, complete_function, delta);
 
-        // deltaP_12 [deltaP_1, deltaP_2]
-        // deltaP_xy12 [deltaP_x_1, deltaP_y_1, deltaP_x_2, deltaP_y_2]
-
         // Velocity changes
         __m256d deltaP_1_4 = _mm256_permute4x64_pd(deltaP_12, 0);
         // [deltaP_1, deltaP_1, deltaP_2 deltaP_2]
@@ -3555,32 +3532,8 @@ DLL_EXPORT void simd_collide_balls(double* rvw1, double* rvw2, float R, float M,
         FLOPS(4, 4, 0, 0, complete_function, velocity);
         surface_velocities = _mm256_fmadd_pd(R_ALTERNATE_4, angular, velocities);
 
-
-        double test[4];
-        _mm256_storeu_pd(test, velocities);
-        _local_velocity_x_1 = test[0];
-        _local_velocity_y_1 = test[1];
-        _local_velocity_x_2 = test[2];
-        _local_velocity_y_2 = test[3];
-
-        double test_a[4];
-        _mm256_storeu_pd(test, angular);
-        _local_angular_velocity_y_1 = test[0];
-        _local_angular_velocity_x_1 = test[1];
-        _local_angular_velocity_y_2 = test[2];
-        _local_angular_velocity_x_2 = test[3];
-
-        double test_z[4];
-        _mm256_storeu_pd(test, angular_z);
-        double local_angular_velocity_z_1 = test_z[2];
-        double local_angular_velocity_z_2 = test_z[3];
-
-        FLOPS(5, 4, 0, 1, complete_function, velocity);
-
-        // update ball-ball slip:
-        // contact_point_velocity_x = _local_velocity_x_1 - _local_velocity_x_2 - R * (local_angular_velocity_z_1 + local_angular_velocity_z_2);
-        // contact_point_velocity_z = R * (_local_angular_velocity_x_1 + _local_angular_velocity_x_2);
-        // ball_ball_contact_point_magnitude = sqrt(contact_point_velocity_x * contact_point_velocity_x + contact_point_velocity_z * contact_point_velocity_z);
+        double _local_velocity_y_1 = ((double*)&velocities)[1];
+        double _local_velocity_y_2 = ((double*)&velocities)[3];
 
         FLOPS(3, 2, 0, 0, complete_function, velocity);
         // Update work and check compression phase
@@ -3594,11 +3547,6 @@ DLL_EXPORT void simd_collide_balls(double* rvw1, double* rvw2, float R, float M,
             FLOPS(1, 2, 0, 0, complete_function, velocity);
             work_required = (1.0 + e_b * e_b) * work_compression;
         }
-
-        __m256d loop_cond_rhs = _mm256_set_pd(0.0, 0.0, work_required, 0.0);
-        __m256d loop_cond_lhs = _mm256_set_pd(0.0, 0.0, total_work, velocity_diff_y);
-        __m256d cmp = _mm256_cmp_pd(loop_cond_lhs, loop_cond_rhs, _CMP_LT_OQ);
-        mask = _mm256_movemask_pd(cmp);
 
         END_PROFILE(velocity);
     }

@@ -18,10 +18,10 @@ set(SOURCES
 )
 
 set(FLAGS
-    -O3
+    # -O3
     -mfma
     -mavx2
-    # -Ofast
+    -Ofast
     -ffast-math
     # #-march=native # unpredictable, most of the times worsens
     # -Wall
