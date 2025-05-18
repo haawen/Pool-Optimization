@@ -10,3 +10,7 @@ uv.lock
 
 plots/*
 !plots/.gitkeep
+
+toolchain.cmake
+
+.DS_Store
