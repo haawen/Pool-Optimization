@@ -16,6 +16,7 @@
 
 /* ======================== WIN32 ======================= */
 #else
+#include <intrin.h>
 
 	#define myInt64 signed __int64
 	#define INT32 unsigned __int32
@@ -51,25 +52,26 @@
 	#define CPUID() \
 		ASM VOLATILE ("cpuid" : : "a" (0) : "bx", "cx", "dx" )
 
+	
+
 /* ======================== WIN32 ======================= */
 #else
 
-	typedef union
-	{       myInt64 int64;
-			struct {INT32 lo, hi;} int32;
-	} tsc_counter;
+typedef union {
+    unsigned __int64 int64;
+    struct { unsigned int lo, hi; } int32;
+} tsc_counter;
 
-	#define RDTSC(cpu_c)   \
-	{       __asm rdtsc    \
-			__asm mov (cpu_c).int32.lo,eax  \
-			__asm mov (cpu_c).int32.hi,edx  \
-	}
+#define RDTSC(cpu_c) \
+    { \
+        cpu_c.int64 = __rdtsc(); \
+    }
 
-	#define CPUID() \
-	{ \
-		__asm mov eax, 0 \
-		__asm cpuid \
-	}
+#define CPUID() \
+    { \
+        int cpuInfo[4]; \
+        __cpuid(cpuInfo, 0); \
+    }
 
 #endif
 
@@ -78,6 +80,7 @@ inline void init_tsc() {
 	; // no need to initialize anything for x86
 }
 
+#ifdef _WIN32
 inline myInt64 start_tsc(void) {
     tsc_counter start;
     CPUID();
@@ -86,8 +89,23 @@ inline myInt64 start_tsc(void) {
 }
 
 inline myInt64 stop_tsc(myInt64 start) {
-	tsc_counter end;
-	RDTSC(end);
-	CPUID();
-	return COUNTER_VAL(end) - start;
+    tsc_counter end;
+    RDTSC(end);
+    CPUID();
+    return COUNTER_VAL(end) - start;
 }
+#else
+static inline __attribute__((always_inline)) myInt64 start_tsc(void) {
+    tsc_counter start;
+    CPUID();
+    RDTSC(start);
+    return COUNTER_VAL(start);
+}
+
+static inline __attribute__((always_inline)) myInt64 stop_tsc(myInt64 start) {
+    tsc_counter end;
+    RDTSC(end);
+    CPUID();
+    return COUNTER_VAL(end) - start;
+}
+#endif

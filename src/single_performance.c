@@ -1,6 +1,8 @@
-#include <stdio.h>
-
 #include "pool.h"
+#include <stdbool.h>
+
+#define ITERATIONS 10000
+
 
 typedef struct {
     float R;          // Ball radius
@@ -22,6 +24,7 @@ typedef struct {
 } CollisionData;
 
 #define TEST_CASES 5
+double tolerance = 1e-6;
 CollisionData reference[TEST_CASES];
 
 void setUp(void) {
@@ -167,81 +170,45 @@ void setUp(void) {
             .angular = { -20.163274160647937, 74.68250107163708, -2.0380303552667263 }
         }
     };
-}
 
+}
 typedef void (*CollideBallsFn)(double*, double*, float, float, float, float, float, float, float, int, double*, double*, Profile*, Branch*);
 
-void call_function(const char* name, CollideBallsFn collide_fn) {
+void call_function(CollideBallsFn collide_fn) {
 
-    FILE* csv = fopen("flops.csv", "a");
-    if (csv == NULL) {
-        perror("Failed to open CSV file");
-        return;
-    }
-
-    Profile profiles[6];
-    Branch branches[12] = {0};
-
-    for(int i = 0; i < TEST_CASES; i++) {
         double rvw1_result[9];
         double rvw2_result[9];
 
-        for (int p = 0; p < 6; p++) {
-            init_profiling_section(&profiles[p]);
-        }
+        for(int i = 0; i < TEST_CASES; i++) {
 
-        collide_fn(
-            reference[i].rvw1,
-            reference[i].rvw2,
-            reference[i].R,
-            reference[i].M,
-            reference[i].u_s1,
-            reference[i].u_s2,
-            reference[i].u_b,
-            reference[i].e_b,
-            0.0f,           // deltaP
-            reference[i].N,
-            rvw1_result,
-            rvw2_result,
-            profiles,
-            branches
-        );
+            for(int j = 0; j < ITERATIONS; j++) {
 
-        fprintf(csv, "%s,%s,%d,%ld,%ld,%ld,%ld,%ld,%ld\n", name, "collide_balls", i, profiles[0].flops, profiles[0].memory * sizeof(double), profiles[0].ADDS, profiles[0].MULS, profiles[0].DIVS, profiles[0].SQRT);
-        fprintf(csv, "%s,%s,%d,%ld,%ld,%ld,%ld,%ld,%ld\n", name, "Initialization", i, profiles[1].flops, profiles[1].memory* sizeof(double), profiles[1].ADDS, profiles[1].MULS, profiles[1].DIVS, profiles[1].SQRT);
-        fprintf(csv, "%s,%s,%d,%ld,%ld,%ld,%ld,%ld,%ld\n", name, "Impulse", i, profiles[2].flops, profiles[2].memory* sizeof(double), profiles[2].ADDS, profiles[2].MULS, profiles[2].DIVS, profiles[2].SQRT);
-        fprintf(csv, "%s,%s,%d,%ld,%ld,%ld,%ld,%ld,%ld\n", name, "Delta", i, profiles[3].flops, profiles[3].memory* sizeof(double), profiles[3].ADDS, profiles[3].MULS, profiles[3].DIVS, profiles[3].SQRT);
-        fprintf(csv, "%s,%s,%d,%ld,%ld,%ld,%ld,%ld,%ld\n", name, "Velocity", i, profiles[4].flops, profiles[4].memory* sizeof(double), profiles[4].ADDS, profiles[4].MULS, profiles[4].DIVS, profiles[4].SQRT);
-        fprintf(csv, "%s,%s,%d,%ld,%ld,%ld,%ld,%ld,%ld\n", name, "Transform to World Frame", i, profiles[5].flops, profiles[5].memory* sizeof(double), profiles[5].ADDS, profiles[5].MULS, profiles[5].DIVS, profiles[5].SQRT);
+                collide_fn(
+                    reference[i].rvw1,
+                    reference[i].rvw2,
+                    reference[i].R,
+                    reference[i].M,
+                    reference[i].u_s1,
+                    reference[i].u_s2,
+                    reference[i].u_b,
+                    reference[i].e_b,
+                    0.0f,
+                    reference[i].N,
+                    rvw1_result,
+                    rvw2_result,
+                    NULL,
+                    NULL
+                );
 
-        printf("=== BRANCH PREDICTION ANALYSIS %s TC %d === \n", name, i);
-        for(int b = 0; b < 12; b++) {
-            printf("Executed Branch %d %lu times.\n", b, branches[b].count);
-        }
-    }
-
-    fclose(csv);
+            }
+}
 }
 
 int main() {
-    FILE* csv = fopen("flops.csv", "w");
-    if (csv == NULL) {
-        perror("Failed to open CSV file");
-        return 0;
-    }
-    fprintf(csv, "Function,Section,Test Case,Flops,Memory,ADDS,MULS,DIVS,SQRT\n");
-    fclose(csv);
 
     setUp();
 
-    call_function("Basic Implementation", collide_balls);
-    call_function("Less SQRT", less_sqrt_collide_balls);
-    call_function("Scalar Less SQRT", scalar_less_sqrt);
-    call_function("Precompute", simple_precompute_cb);
-    call_function("Branch Pred", branch_prediction_collide_balls);
-    call_function("Removed Unused Branches", remove_unused_branches);
-    call_function("Code Motion", code_motion_collide_balls2);
-    call_function("SIMD", simd_collide_balls);
+    call_function(code_motion_collide_balls2);
 
     return 0;
 }
