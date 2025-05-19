@@ -350,6 +350,13 @@ void test_collide_balls_simd(void) {
     call_function("SIMD", simd_collide_balls);
 }
 
+void test_simd_collide_ball_2(void) {
+    call_function("SIMD Optimized Impulse", simd_collide_ball_2);
+}
+
+void test_improved_symmetry(void) {
+    call_function("Improved Symmetry", improved_symmetry_collide_balls);
+}
 
 int main() {
     #ifdef _WIN32
@@ -377,9 +384,10 @@ int main() {
         test_approx_sqrt,
         test_approx_symmetry,
         test_collide_balls_simd,
+        test_simd_collide_ball_2
     };
 
-    const int num_tests = sizeof(tests) / sizeof(tests[0]);
+    #define NUM_FUNCTIONS (sizeof(tests) / sizeof(tests[0]))
 
     UNITY_BEGIN();
 
@@ -387,14 +395,14 @@ int main() {
         for(int i = 0; i < TEST_RUNNER_ITERATIONS; i++) {
 
              // Fisher–Yates shuffle
-            for (int i = num_tests - 1; i > 0; i--) {
+            for (int i = NUM_FUNCTIONS - 1; i > 0; i--) {
                 int j = rand() % (i + 1);
                 void (*tmp)(void) = tests[i];
                 tests[i] = tests[j];
                 tests[j] = tmp;
             }
 
-            for (int i = 0; i < num_tests; i++) {
+            for (int i = 0; i < NUM_FUNCTIONS; i++) {
                 RUN_TEST(tests[i]);
             }
 

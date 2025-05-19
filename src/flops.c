@@ -242,6 +242,7 @@ int main() {
     call_function("Removed Unused Branches", remove_unused_branches);
     call_function("Code Motion", code_motion_collide_balls2);
     call_function("SIMD", simd_collide_balls);
+    call_function("SIMD Optimized Impulse", simd_collide_ball_2);
 
     return 0;
 }
