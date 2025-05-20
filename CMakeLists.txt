@@ -28,7 +28,6 @@ set(FLAGS
     # -pedantic
     # -mfma
     -fno-math-errno
-    # #-mavx2          # We dont do SIMD yet
 
     -funroll-loops
 

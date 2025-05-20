@@ -51,6 +51,63 @@
 #define BRANCH(i)
 #endif
 
+typedef __m256d v3d;                   /* 4 doubles, but we use only 3 */
+
+#define V3D_SET(x, y, z)       _mm256_set_pd(0.0, (z), (y), (x))
+#define V3D_LOAD(p)            _mm256_set_pd(0.0, (p)[2], (p)[1], (p)[0])
+#define V3D_STORE(p, v)        do {                     \
+                                  double _tmp[4];       \
+                                  _mm256_storeu_pd(_tmp, (v)); \
+                                  (p)[0] = _tmp[0];     \
+                                  (p)[1] = _tmp[1];     \
+                                  (p)[2] = _tmp[2];     \
+                              } while (0)
+
+#define V3D_ADD(a,b)           _mm256_add_pd((a),(b))
+#define V3D_SUB(a,b)           _mm256_sub_pd((a),(b))
+#define V3D_MULS(a,s)          _mm256_mul_pd((a), _mm256_set1_pd(s))
+#define V3D_FMADD(a,b,c)       _mm256_fmadd_pd((a),(b),(c))   /* a*b+c */
+#define V3D_FMSUB(a,b,c)       _mm256_fmsub_pd((a),(b),(c))   /* a*b-c */
+
+/* horizontal add of x,y,z : result in lowest lane */
+static inline double v3d_dot(v3d a, v3d b)
+{
+    __m256d prod = _mm256_mul_pd(a, b);                   /* [0,z*y,y*y,x*x] */
+    __m128d hi   = _mm256_extractf128_pd(prod, 1);        /* z*y | _        */
+    __m128d lo   = _mm256_castpd256_pd128(prod);          /* y*y | x*x      */
+    __m128d sum1 = _mm_add_pd(lo, hi);                    /* y*y+z*y | x*x  */
+    __m128d shuf = _mm_shuffle_pd(sum1, sum1, 0b01);      /* swap lanes     */
+    __m128d dot  = _mm_add_pd(sum1, shuf);                /* x*x+y*y+z*z|dup*/
+    return _mm_cvtsd_f64(dot);
+}
+
+static inline v3d v3d_cross(v3d a, v3d b)
+{
+    /*  lane order in v3d = [ x | y | z | _ ]  */
+
+    /* P(x,y,z) = ( y , z , x )  */
+    const __m256d pa = _mm256_permute4x64_pd(a, _MM_SHUFFLE(3,0,2,1));
+    const __m256d pb = _mm256_permute4x64_pd(b, _MM_SHUFFLE(3,0,2,1));
+
+    /* Q(x,y,z) = ( z , x , y )  */
+    const __m256d qa = _mm256_permute4x64_pd(a, _MM_SHUFFLE(3,1,0,2));
+    const __m256d qb = _mm256_permute4x64_pd(b, _MM_SHUFFLE(3,1,0,2));
+
+    /* cross = P(a)*Q(b) − Q(a)*P(b) */
+    return _mm256_sub_pd(_mm256_mul_pd(pa, qb),
+                         _mm256_mul_pd(qa, pb));
+}
+
+/* ------------ helpers to get/set lane 0 / 1 from an __m128d -------- */
+static inline double lane0(__m128d v) { return _mm_cvtsd_f64(v); }
+static inline double lane1(__m128d v)
+{
+    return _mm_cvtsd_f64(_mm_unpackhi_pd(v,v));
+}
+static inline __m128d set_lanes(double a0,double a1)
+{
+    return _mm_setr_pd(a0,a1);   /* lane0=a0 , lane1=a1 */
+}
 
 DLL_EXPORT void hello_world(const char* matrix_name, double* rvw) {
 
@@ -1068,6 +1125,23 @@ DLL_EXPORT void approxsq_collide_balls(double* rvw1, double* rvw2, float R, floa
     END_PROFILE(after_loop);
     END_PROFILE(complete_function);
 }
+double fast_inv_sqrt(double x, double z, int iterations) {
+    if (x < 1e-16) return 0.0;
+    
+    // Every 10th iteration use regular sqrt for better stability
+    if (iterations % 2 == 0) {
+        return 1.0 / sqrt(x);
+    }
+    
+    // Initial guess (using previous value)
+    double y = z;
+    
+    // Two Newton iterations
+    y *= (1.5 - (x * 0.5 * y * y));
+    y *= (1.5 - (x * 0.5 * y * y));
+    
+    return y;
+}
 
 DLL_EXPORT void approx_symmetry(double* rvw1, double* rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double* rvw1_result, double* rvw2_result, Profile* profiles, Branch* branches)
 {
@@ -1134,13 +1208,16 @@ DLL_EXPORT void approx_symmetry(double* rvw1, double* rvw2, float R, float M, fl
     double surface_velocity_x_2 = fma(R, local_angular_velocity_y_2,  local_velocity_x_2);
     double surface_velocity_y_2 = fma(-R, local_angular_velocity_x_2, local_velocity_y_2);
 
+    double inv_sv2 = 1.0 / sqrt(surface_velocity_x_2 * surface_velocity_x_2 + surface_velocity_y_2 * surface_velocity_y_2);
+    double inv_sv1 = 1.0 / sqrt(surface_velocity_x_1*surface_velocity_x_1 + surface_velocity_y_1*surface_velocity_y_1);
+
     /*
     double surface_velocity_mag1_sq = surface_velocity_x_1*surface_velocity_x_1
                                     + surface_velocity_y_1*surface_velocity_y_1;
     double surface_velocity_mag2_sq = surface_velocity_x_2*surface_velocity_x_2
                                     + surface_velocity_y_2*surface_velocity_y_2;
     */
-
+    
     /* ---------------------- contact point slip ------------------------ */
     double contact_point_velocity_x =  local_velocity_x_1 - local_velocity_x_2
                                      - R*(local_angular_velocity_z_1 + local_angular_velocity_z_2);
@@ -1166,6 +1243,8 @@ DLL_EXPORT void approx_symmetry(double* rvw1, double* rvw2, float R, float M, fl
     double deltaP_x_1 = 0, deltaP_y_1 = 0, deltaP_x_2 = 0, deltaP_y_2 = 0;
 
     END_PROFILE(before_loop);
+    //TODO: Use newton raphson every second iteration
+    int iter = 0;
     while (velocity_diff_y < 0.0 || total_work < work_required)
     {
         /* -------------------- impulse calculation -------------------- */
@@ -1196,7 +1275,6 @@ DLL_EXPORT void approx_symmetry(double* rvw1, double* rvw2, float R, float M, fl
                         deltaP_x_2 = deltaP_y_2 = 0.0;
                     } else {
                         BRANCH(6);
-                        double inv_sv2 = 1.0 / sqrt(surface_velocity_x_2 * surface_velocity_x_2 + surface_velocity_y_2 * surface_velocity_y_2);
                         deltaP_x_2 = -u_s2 * surface_velocity_x_2 * inv_sv2 * deltaP_2;
                         deltaP_y_2 = -u_s2 * surface_velocity_y_2 * inv_sv2 * deltaP_2;
                     }
@@ -1208,7 +1286,6 @@ DLL_EXPORT void approx_symmetry(double* rvw1, double* rvw2, float R, float M, fl
                         deltaP_x_1 = deltaP_y_1 = 0.0;
                     } else {
                         BRANCH(9);
-                        double inv_sv1 = 1.0 / sqrt(surface_velocity_x_1*surface_velocity_x_1 + surface_velocity_y_1*surface_velocity_y_1);
                         deltaP_x_1 = u_s1 * surface_velocity_x_1 * inv_sv1 * deltaP_2;
                         deltaP_y_1 = u_s1 * surface_velocity_y_1 * inv_sv1 * deltaP_2;
                     }
@@ -1248,6 +1325,9 @@ DLL_EXPORT void approx_symmetry(double* rvw1, double* rvw2, float R, float M, fl
         surface_velocity_y_1 = fma(-R, local_angular_velocity_x_1,  local_velocity_y_1);
         surface_velocity_x_2 = fma(R,  local_angular_velocity_y_2,  local_velocity_x_2);
         surface_velocity_y_2 = fma(-R, local_angular_velocity_x_2,  local_velocity_y_2);
+        
+        inv_sv2 = fast_inv_sqrt(surface_velocity_x_2 * surface_velocity_x_2 + surface_velocity_y_2 * surface_velocity_y_2, inv_sv2, iter);
+        inv_sv1 = fast_inv_sqrt(surface_velocity_x_1*surface_velocity_x_1 + surface_velocity_y_1*surface_velocity_y_1, inv_sv1, iter);
 
         /*
         surface_velocity_mag1_sq = surface_velocity_x_1*surface_velocity_x_1
@@ -1256,7 +1336,7 @@ DLL_EXPORT void approx_symmetry(double* rvw1, double* rvw2, float R, float M, fl
                                 + surface_velocity_y_2*surface_velocity_y_2;
         */
 
-        contact_point_velocity_x = local_velocity_x_1 - local_velocity_x_2
+        contact_point_velocity_x = local_velocity_x_1 - local_velocity_x_2  
                                  - (local_angular_velocity_z_1 + local_angular_velocity_z_2)*R;
         contact_point_velocity_z = (local_angular_velocity_x_1 + local_angular_velocity_x_2)*R;
         contact_inv_mag          *= 0.5 * (3.0 - (contact_point_velocity_x * contact_point_velocity_x +
@@ -1272,8 +1352,9 @@ DLL_EXPORT void approx_symmetry(double* rvw1, double* rvw2, float R, float M, fl
             work_compression = total_work;
             work_required    = (1.0 + e_b * e_b) * work_compression;
         }
-
+        
         END_PROFILE(velocity);
+        iter++;
     }
     /* ------------------------------------------------------------------ */
     /* ---------------------- epilogue – UNCHANGED ----------------------- */
@@ -4141,6 +4222,419 @@ DLL_EXPORT void simd_collide_ball_2(double* rvw1, double* rvw2, float R, float M
 
     rvw1_result[8] = _local_angular_velocity_z_1;
     rvw2_result[8] = _local_angular_velocity_z_2;
+
+    END_PROFILE(after_loop);
+    END_PROFILE(complete_function);
+}
+DLL_EXPORT void simd_scalar_loop(double* rvw1, double* rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double* rvw1_result, double* rvw2_result, Profile* profiles, Branch* branches){
+    #ifdef PROFILE
+        Profile *complete_function=&profiles[0],*before_loop=&profiles[1],
+                *impulse=&profiles[2],*delta=&profiles[3],
+                *velocity=&profiles[4],*after_loop=&profiles[5];
+    #endif
+    START_PROFILE(complete_function);
+    START_PROFILE(before_loop);
+
+    /* ---------------- fetch & convert inputs to v3d ---------------- */
+    v3d trans1   = V3D_LOAD(get_displacement(rvw1));
+    v3d trans2   = V3D_LOAD(get_displacement(rvw2));
+
+    v3d vel1     = V3D_LOAD(get_velocity(rvw1));
+    v3d vel2     = V3D_LOAD(get_velocity(rvw2));
+
+    v3d ang1     = V3D_LOAD(get_angular_velocity(rvw1));
+    v3d ang2     = V3D_LOAD(get_angular_velocity(rvw2));
+
+    /* --------------- axis basis ------------------------------------ */
+    v3d offset   = V3D_SUB(trans2, trans1);               /* p₂-p₁ */
+    double inv_len= 1.0 / sqrt(v3d_dot(offset, offset));
+    v3d forward  = V3D_MULS(offset, inv_len);
+    const v3d up = V3D_SET(0.0,0.0,1.0);
+    v3d right    = v3d_cross(forward, up);
+
+    /* --------------- local velocities ------------------------------ */
+    double lvx1 = v3d_dot(vel1, right);
+    double lvy1 = v3d_dot(vel1, forward);
+    double lvx2 = v3d_dot(vel2, right);
+    double lvy2 = v3d_dot(vel2, forward);
+
+    double lax1 = v3d_dot(ang1, right);
+    double lay1 = v3d_dot(ang1, forward);
+    double laz1 = v3d_dot(ang1, up);
+
+    double lax2 = v3d_dot(ang2, right);
+    double lay2 = v3d_dot(ang2, forward);
+    double laz2 = v3d_dot(ang2, up);
+
+    /* --------------- pre-loop scalars ------------------------------ */
+    const double invM  = 1.0 / M;
+    const double C     = 5.0 / (2.0 * M * R);
+
+    double svx1 = fma(R, lay1,  lvx1);
+    double svy1 = fma(-R,lax1,  lvy1);
+    double svx2 = fma(R, lay2,  lvx2);
+    double svy2 = fma(-R,lax2,  lvy2);
+
+    double svlen1 = sqrt(svx1*svx1 + svy1*svy1);
+    double svlen2 = sqrt(svx2*svx2 + svy2*svy2);
+
+    double cpx   = lvx1 - lvx2 - R*(laz1 + laz2);
+    double cpz   = R*(lax1 + lax2);
+    double cp_len= sqrt(cpx*cpx + cpz*cpz);
+
+    double vdiff = lvy2 - lvy1;
+
+    if (deltaP == 0.0f)
+        deltaP = 0.5 * (1.0 + e_b) * M * fabs(vdiff) / N;
+
+    double total_work = 0.0, work_required = INFINITY, work_compr = 0.0;
+
+    double dP1 = deltaP, dP2 = deltaP;
+    double dPx1=0,dPy1=0,dPx2=0,dPy2=0;
+
+    END_PROFILE(before_loop);
+
+    /* ----------------------------- main loop ----------------------- */
+    while (vdiff < 0.0 || total_work < work_required)
+    {
+        START_PROFILE(impulse);
+
+        if (cp_len < 1e-16) {
+            dP1=dP2=dPx1=dPy1=dPx2=dPy2=0.0;
+        } else {
+            dP1 = -u_b * deltaP * cpx / cp_len;
+
+            if (fabs(cpz) < 1e-16) {
+                dP2=dPx1=dPy1=dPx2=dPy2=0.0;
+            } else {
+                dP2 = -u_b * deltaP * cpz / cp_len;
+                if (dP2 > 0.0) {
+                    dPx1 = dPy1 = 0.0;
+                    if (svlen2 == 0.0) {
+                        dPx2 = dPy2 = 0.0;
+                    } else {
+                        double inv  = 1.0 / svlen2;
+                        dPx2 = -u_s2 * svx2 * inv * dP2;
+                        dPy2 = -u_s2 * svy2 * inv * dP2;
+                    }
+                } else {
+                    dPx2 = dPy2 = 0.0;
+                    if (svlen1 == 0.0) {
+                        dPx1 = dPy1 = 0.0;
+                    } else {
+                        double inv  = 1.0 / svlen1;
+                        dPx1 =  u_s1 * svx1 * inv * dP2;
+                        dPy1 =  u_s1 * svy1 * inv * dP2;
+                    }
+                }
+            }
+        }
+        END_PROFILE(impulse);
+        START_PROFILE(delta);
+
+        /* linear velocity update (scalar) */
+        lvx1 += (dP1+dPx1)*invM;   lvy1 += (-deltaP+dPy1)*invM;
+        lvx2 += (-dP1+dPx2)*invM;  lvy2 += ( deltaP+dPy2)*invM;
+
+        /* angular velocity update */
+        lax1 += C*(dP2+dPy1);   lay1 += C*(-dPx1);   laz1 += C*(-dP1);
+        lax2 += C*(dP2+dPy2);   lay2 += C*(-dPx2);   laz2 += C*(-dP1);
+
+        END_PROFILE(delta);
+        START_PROFILE(velocity);
+
+        /* recompute slips */
+        svx1 = fma(R, lay1,  lvx1);   svy1 = fma(-R,lax1, lvy1);
+        svx2 = fma(R, lay2,  lvx2);   svy2 = fma(-R,lax2, lvy2);
+        svlen1= sqrt(svx1*svx1 + svy1*svy1);
+        svlen2= sqrt(svx2*svx2 + svy2*svy2);
+
+        cpx   = lvx1 - lvx2 - R*(laz1 + laz2);
+        cpz   = R*(lax1 + lax2);
+        cp_len= sqrt(cpx*cpx + cpz*cpz);
+
+        double vdiff_prev = vdiff;
+        vdiff = lvy2 - lvy1;
+        total_work += 0.5*deltaP*fabs(vdiff_prev + vdiff);
+
+        if (work_compr==0.0 && vdiff>0.0){
+            work_compr = total_work;
+            work_required = (1.0 + e_b*e_b)*work_compr;
+        }
+        END_PROFILE(velocity);
+    }
+
+    /* ---------------------- write back results ---------------------- */
+    START_PROFILE(after_loop);
+
+    /* broadcast the local scalars once */
+    __m256d bx1 = _mm256_set1_pd(lvx1);
+    __m256d by1 = _mm256_set1_pd(lvy1);
+    __m256d bx2 = _mm256_set1_pd(lvx2);
+    __m256d by2 = _mm256_set1_pd(lvy2);
+
+    __m256d bax1 = _mm256_set1_pd(lax1);
+    __m256d bay1 = _mm256_set1_pd(lay1);
+    __m256d baz1 = _mm256_set1_pd(laz1);
+
+    __m256d bax2 = _mm256_set1_pd(lax2);
+    __m256d bay2 = _mm256_set1_pd(lay2);
+    __m256d baz2 = _mm256_set1_pd(laz2);
+
+    const __m256d up_v = V3D_SET(0.0, 0.0, 1.0);
+
+    /* world linear velocity = right*lx + forward*ly */
+    __m256d wvel1 = _mm256_fmadd_pd(right, bx1, _mm256_mul_pd(forward, by1));
+    __m256d wvel2 = _mm256_fmadd_pd(right, bx2, _mm256_mul_pd(forward, by2));
+
+    /* world angular velocity = right*lax + forward*lay + up*laz            */
+    __m256d wang1 = _mm256_fmadd_pd(
+                    up_v,  baz1,
+                    _mm256_fmadd_pd(forward, bay1, _mm256_mul_pd(right, bax1)));
+
+    __m256d wang2 = _mm256_fmadd_pd(
+                    up_v,  baz2,
+                    _mm256_fmadd_pd(forward, bay2, _mm256_mul_pd(right, bax2)));
+
+    /* store x,y,z from lanes 0,1,2                                         */
+    double tmp[4];
+
+    _mm256_storeu_pd(tmp, wvel1);   /* [x y z _] */
+    rvw1_result[3] = tmp[0];
+    rvw1_result[4] = tmp[1];
+    rvw1_result[5] = tmp[2];
+
+    _mm256_storeu_pd(tmp, wvel2);
+    rvw2_result[3] = tmp[0];
+    rvw2_result[4] = tmp[1];
+    rvw2_result[5] = tmp[2];
+
+    _mm256_storeu_pd(tmp, wang1);
+    rvw1_result[6] = tmp[0];
+    rvw1_result[7] = tmp[1];
+    rvw1_result[8] = tmp[2];
+
+    _mm256_storeu_pd(tmp, wang2);
+    rvw2_result[6] = tmp[0];
+    rvw2_result[7] = tmp[1];
+    rvw2_result[8] = tmp[2];
+
+    END_PROFILE(after_loop);
+    END_PROFILE(complete_function);
+}
+
+
+DLL_EXPORT void SIMD_Full_basic(double* rvw1, double* rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double* rvw1_result, double* rvw2_result, Profile* profiles, Branch* branches){
+    #ifdef PROFILE
+        Profile *complete_function=&profiles[0],*before_loop=&profiles[1],
+                *impulse=&profiles[2],*delta=&profiles[3],
+                *velocity=&profiles[4],*after_loop=&profiles[5];
+    #endif
+    START_PROFILE(complete_function);
+    START_PROFILE(before_loop);
+
+    /* ---------------- fetch & convert inputs to v3d ---------------- */
+    v3d trans1   = V3D_LOAD(get_displacement(rvw1));
+    v3d trans2   = V3D_LOAD(get_displacement(rvw2));
+
+    v3d vel1     = V3D_LOAD(get_velocity(rvw1));
+    v3d vel2     = V3D_LOAD(get_velocity(rvw2));
+
+    v3d ang1     = V3D_LOAD(get_angular_velocity(rvw1));
+    v3d ang2     = V3D_LOAD(get_angular_velocity(rvw2));
+
+    /* --------------- axis basis ------------------------------------ */
+    v3d offset   = V3D_SUB(trans2, trans1);               /* p₂-p₁ */
+    double inv_len= 1.0 / sqrt(v3d_dot(offset, offset));
+    v3d forward  = V3D_MULS(offset, inv_len);
+    const v3d up = V3D_SET(0.0,0.0,1.0);
+    v3d right    = v3d_cross(forward, up);
+
+    /* --------------- local velocities ------------------------------ */
+    __m128d lvx = set_lanes(v3d_dot(vel1,right)   , v3d_dot(vel2,right));
+    __m128d lvy = set_lanes(v3d_dot(vel1,forward) , v3d_dot(vel2,forward));
+
+    __m128d lax = set_lanes(v3d_dot(ang1,right)   , v3d_dot(ang2,right));
+    __m128d lay = set_lanes(v3d_dot(ang1,forward) , v3d_dot(ang2,forward));
+    __m128d laz = set_lanes(v3d_dot(ang1,up)      , v3d_dot(ang2,up));
+
+
+    /* ------------------ scalars shared by both balls ----------------*/
+    const double invM_scalar = 1.0 / M;
+    const __m128d invM_v     = _mm_set1_pd(invM_scalar);   /* idea #5 */
+    const double  C          = 5.0 / (2.0 * M * R);
+
+    /* ------------ pre-loop slip & contact values (scalar) -----------*/
+    double svx1 = fma(R, lane0(lay) /*lay1*/, lane0(lvx));
+    double svy1 = fma(-R,lane0(lax), lane0(lvy));
+    double svx2 = fma(R, lane1(lay), lane1(lvx));
+    double svy2 = fma(-R,lane1(lax), lane1(lvy));
+
+    double svlen1 = sqrt(svx1*svx1 + svy1*svy1);
+    double svlen2 = sqrt(svx2*svx2 + svy2*svy2);
+
+    double cpx   = lane0(lvx) - lane1(lvx) - R*(lane0(laz) + lane1(laz));
+    double cpz   = R*(lane0(lax) + lane1(lax));
+    double cp_len= sqrt(cpx*cpx + cpz*cpz);
+
+    double vdiff = lane1(lvy) - lane0(lvy);
+
+    if (deltaP == 0.0f)
+        deltaP = 0.5 * (1.0 + e_b) * M * fabs(vdiff) / N;
+
+    double total_work = 0.0, work_required = INFINITY, work_compr = 0.0;
+
+    double dP1 = deltaP, dP2 = deltaP;
+    double dPx1=0,dPy1=0,dPx2=0,dPy2=0;
+
+    END_PROFILE(before_loop);
+
+    /* ----------------------------- main loop ----------------------- */
+    while (vdiff < 0.0 || total_work < work_required)
+    {
+        START_PROFILE(impulse);
+
+        if (cp_len < 1e-16) {
+            dP1=dP2=dPx1=dPy1=dPx2=dPy2=0.0;
+        } else {
+            dP1 = -u_b * deltaP * cpx / cp_len;
+
+            if (fabs(cpz) < 1e-16) {
+                dP2=dPx1=dPy1=dPx2=dPy2=0.0;
+            } else {
+                dP2 = -u_b * deltaP * cpz / cp_len;
+                if (dP2 > 0.0) {
+                    dPx1 = dPy1 = 0.0;
+                    if (svlen2 == 0.0) {
+                        dPx2 = dPy2 = 0.0;
+                    } else {
+                        double inv  = 1.0 / svlen2;
+                        dPx2 = -u_s2 * svx2 * inv * dP2;
+                        dPy2 = -u_s2 * svy2 * inv * dP2;
+                    }
+                } else {
+                    dPx2 = dPy2 = 0.0;
+                    if (svlen1 == 0.0) {
+                        dPx1 = dPy1 = 0.0;
+                    } else {
+                        double inv  = 1.0 / svlen1;
+                        dPx1 =  u_s1 * svx1 * inv * dP2;
+                        dPy1 =  u_s1 * svy1 * inv * dP2;
+                    }
+                }
+            }
+        }
+        END_PROFILE(impulse);
+        /* ------------------ update linear + angular vel -------------- */
+        START_PROFILE(delta);
+
+        /* pairwise LINEAR velocity update (128-bit) */
+        __m128d dvx = set_lanes(dP1 + dPx1,  -dP1 + dPx2);  /* {Δvx₁, Δvx₂} */
+        __m128d dvy = set_lanes(-deltaP + dPy1,  deltaP + dPy2);
+
+        lvx = _mm_fmadd_pd(dvx, invM_v, lvx);   /* v += ΔP * invM */
+        lvy = _mm_fmadd_pd(dvy, invM_v, lvy);
+
+        /* pairwise ANGULAR velocity update (128-bit) */
+        __m128d dlax = _mm_mul_pd(set_lanes(dP2 + dPy1,  dP2 + dPy2), _mm_set1_pd(C));
+        __m128d dlay = _mm_mul_pd(set_lanes(-dPx1     , -dPx2     ), _mm_set1_pd(C));
+        __m128d dlaz = _mm_set1_pd(C * (-dP1));          /* same for both lanes */
+
+        lax = _mm_add_pd(lax, dlax);
+        lay = _mm_add_pd(lay, dlay);
+        laz = _mm_add_pd(laz, dlaz);
+
+        END_PROFILE(delta);
+        START_PROFILE(velocity);
+
+        /* recompute slips */
+        double lvx1 = lane0(lvx), lvx2 = lane1(lvx);
+        double lvy1 = lane0(lvy), lvy2 = lane1(lvy);
+
+        double lax1 = lane0(lax), lax2 = lane1(lax);
+        double lay1 = lane0(lay), lay2 = lane1(lay);
+        double laz1 = lane0(laz), laz2 = lane1(laz);
+        svx1 = fma(R, lay1,  lvx1);   svy1 = fma(-R,lax1, lvy1);
+        svx2 = fma(R, lay2,  lvx2);   svy2 = fma(-R,lax2, lvy2);
+        svlen1= sqrt(svx1*svx1 + svy1*svy1);
+        svlen2= sqrt(svx2*svx2 + svy2*svy2);
+
+        cpx   = lvx1 - lvx2 - R*(laz1 + laz2);
+        cpz   = R*(lax1 + lax2);
+        cp_len= sqrt(cpx*cpx + cpz*cpz);
+
+        double vdiff_prev = vdiff;
+        vdiff = lvy2 - lvy1;
+        total_work += 0.5*deltaP*fabs(vdiff_prev + vdiff);
+
+        if (work_compr==0.0 && vdiff>0.0){
+            work_compr = total_work;
+            work_required = (1.0 + e_b*e_b)*work_compr;
+        }
+        END_PROFILE(velocity);
+    }
+
+    /* ---------------------- write back results ---------------------- */
+    START_PROFILE(after_loop);
+
+    double lvx1 = lane0(lvx), lvx2 = lane1(lvx);
+    double lvy1 = lane0(lvy), lvy2 = lane1(lvy);
+
+    double lax1 = lane0(lax), lax2 = lane1(lax);
+    double lay1 = lane0(lay), lay2 = lane1(lay);
+    double laz1 = lane0(laz), laz2 = lane1(laz);
+
+    /* broadcast the local scalars once */
+    __m256d bx1 = _mm256_set1_pd(lvx1);
+    __m256d by1 = _mm256_set1_pd(lvy1);
+    __m256d bx2 = _mm256_set1_pd(lvx2);
+    __m256d by2 = _mm256_set1_pd(lvy2);
+
+    __m256d bax1 = _mm256_set1_pd(lax1);
+    __m256d bay1 = _mm256_set1_pd(lay1);
+    __m256d baz1 = _mm256_set1_pd(laz1);
+
+    __m256d bax2 = _mm256_set1_pd(lax2);
+    __m256d bay2 = _mm256_set1_pd(lay2);
+    __m256d baz2 = _mm256_set1_pd(laz2);
+
+    const __m256d up_v = V3D_SET(0.0, 0.0, 1.0);
+
+    /* world linear velocity = right*lx + forward*ly */
+    __m256d wvel1 = _mm256_fmadd_pd(right, bx1, _mm256_mul_pd(forward, by1));
+    __m256d wvel2 = _mm256_fmadd_pd(right, bx2, _mm256_mul_pd(forward, by2));
+
+    /* world angular velocity = right*lax + forward*lay + up*laz            */
+    __m256d wang1 = _mm256_fmadd_pd(
+                    up_v,  baz1,
+                    _mm256_fmadd_pd(forward, bay1, _mm256_mul_pd(right, bax1)));
+
+    __m256d wang2 = _mm256_fmadd_pd(
+                    up_v,  baz2,
+                    _mm256_fmadd_pd(forward, bay2, _mm256_mul_pd(right, bax2)));
+
+    /* store x,y,z from lanes 0,1,2                                         */
+    double tmp[4];
+
+    _mm256_storeu_pd(tmp, wvel1);   /* [x y z _] */
+    rvw1_result[3] = tmp[0];
+    rvw1_result[4] = tmp[1];
+    rvw1_result[5] = tmp[2];
+
+    _mm256_storeu_pd(tmp, wvel2);
+    rvw2_result[3] = tmp[0];
+    rvw2_result[4] = tmp[1];
+    rvw2_result[5] = tmp[2];
+
+    _mm256_storeu_pd(tmp, wang1);
+    rvw1_result[6] = tmp[0];
+    rvw1_result[7] = tmp[1];
+    rvw1_result[8] = tmp[2];
+
+    _mm256_storeu_pd(tmp, wang2);
+    rvw2_result[6] = tmp[0];
+    rvw2_result[7] = tmp[1];
+    rvw2_result[8] = tmp[2];
 
     END_PROFILE(after_loop);
     END_PROFILE(complete_function);

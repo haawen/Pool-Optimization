@@ -46,6 +46,10 @@ color_styles = {
     "Scalar Less SQRT": "firebrick",
     "scalar Less SQRT + Approx": "Cyan",
     "Approx + Symmetry": "DarkOrange",
+    "Full SIMD" : "DarkOliveGreen",
+    "SIMD scalar loop" : "DarkGoldenRod",
+    "SIMD Optimized Impulse": "DarkViolet",
+    #"Improved Symmetry": "DarkSeaGreen",
 }
 
 fig, ax = plt.subplots(figsize=(12, 6))  # ✅ This gives both fig and ax

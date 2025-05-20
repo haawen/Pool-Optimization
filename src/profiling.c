@@ -349,7 +349,12 @@ void test_approx_symmetry(void) {
 void test_collide_balls_simd(void) {
     call_function("SIMD", simd_collide_balls);
 }
-
+void test_collide_balls_simd2(void) {
+    call_function("Full SIMD", SIMD_Full_basic);
+}
+void test_collide_balls_simd3(void) {
+    call_function("SIMD scalar loop", simd_scalar_loop);
+}
 void test_simd_collide_ball_2(void) {
     call_function("SIMD Optimized Impulse", simd_collide_ball_2);
 }
@@ -384,7 +389,10 @@ int main() {
         test_approx_sqrt,
         test_approx_symmetry,
         test_collide_balls_simd,
-        test_simd_collide_ball_2
+        //test_simd_collide_ball_2,
+        //test_improved_symmetry,
+        test_collide_balls_simd2,
+        test_collide_balls_simd3,
     };
 
     #define NUM_FUNCTIONS (sizeof(tests) / sizeof(tests[0]))
