@@ -309,6 +309,10 @@ void test_collide_balls_basic(void) {
     call_function("Basic Implementation", collide_balls);
 }
 
+void test_register_relieve(void) {
+    call_function("Register Relieve", code_motion_register_relieve);
+}
+
 void test_precomp(void) {
     call_function("Precompute", simple_precompute_cb);
 }
@@ -330,7 +334,7 @@ void test_remove_unused_branches(void) {
 }
 
 void test_collide_balls_code_motion(void) {
-    call_function("Code Motion", code_motion_collide_balls2);
+    call_function("Code Motion", code_motion_collide_balls);
 }
 void test_scalar_improvements(void) {
     call_function("Scalar Improvements", scalar_improvements);
@@ -343,14 +347,14 @@ void test_approx_sqrt(void) {
     call_function("scalar Less SQRT + Approx", approxsq_collide_balls);
 }
 void test_approx_symmetry(void) {
-    call_function("Approx + Symmetry", approx_symmetry);
+    call_function("Reciprocal Sqrt", recip_sqrt);
 }
 
 void test_collide_balls_simd(void) {
     call_function("SIMD", simd_collide_balls);
 }
 void test_collide_balls_simd2(void) {
-    call_function("Full SIMD", SIMD_Full_basic);
+    //call_function("Full SIMD", SIMD_Full_basic);
 }
 void test_collide_balls_simd3(void) {
     call_function("SIMD scalar loop", simd_scalar_loop);
@@ -388,11 +392,13 @@ int main() {
         test_scalar_sqrt,
         test_approx_sqrt,
         test_approx_symmetry,
-        test_collide_balls_simd,
+        //test_collide_balls_simd,
         //test_simd_collide_ball_2,
-        //test_improved_symmetry,
+        test_improved_symmetry,
         test_collide_balls_simd2,
         test_collide_balls_simd3,
+        test_register_relieve,
+        test_collide_balls_code_motion,
     };
 
     #define NUM_FUNCTIONS (sizeof(tests) / sizeof(tests[0]))

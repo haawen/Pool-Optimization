@@ -28,10 +28,9 @@ set(FLAGS
     # -pedantic
     # -mfma
     -fno-math-errno
-
     -funroll-loops
-
     -ftree-vectorize
+    -fno-omit-frame-pointer
     #-flto          # Worsens
 )
 
@@ -45,7 +44,7 @@ target_compile_options(profiling PRIVATE ${FLAGS})
 target_compile_definitions(profiling PRIVATE UNITY_INCLUDE_DOUBLE)
 
 add_executable(benchmark src/profiling.c ${SOURCES} ${UNITY_DIR}/unity.c)
-target_compile_options(benchmark PRIVATE ${FLAGS})
+target_compile_options(benchmark PRIVATE ${FLAGS} -g)
 
 target_compile_definitions(benchmark PRIVATE UNITY_INCLUDE_DOUBLE)
 
