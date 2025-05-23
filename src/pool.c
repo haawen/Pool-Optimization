@@ -1158,13 +1158,14 @@ DLL_EXPORT void recip_sqrt(double* rvw1, double* rvw2, float R, float M, float u
     START_PROFILE(before_loop);
 
     MEMORY(18, complete_function, before_loop);
-    double* translation_1     = get_displacement     (rvw1);
-    double* velocity_1        = get_velocity         (rvw1);
-    double* angular_velocity_1= get_angular_velocity (rvw1);
+    double* translation_1     = rvw1;
+    double* velocity_1        = &rvw1[3];
+    double* angular_velocity_1= &rvw1[6];
 
-    double* translation_2     = get_displacement     (rvw2);
-    double* velocity_2        = get_velocity         (rvw2);
-    double* angular_velocity_2= get_angular_velocity (rvw2);
+
+    double* translation_2     = rvw2;
+    double* velocity_2        = &rvw2[3];
+    double* angular_velocity_2= &rvw2[6];
 
     /* ------------------------------------------------------------------ */
     /* ----------------------   scalar tweaks   -------------------------- */
@@ -1175,33 +1176,37 @@ DLL_EXPORT void recip_sqrt(double* rvw1, double* rvw2, float R, float M, float u
     double C        = 5.0 * invM * invR * 0.5;   /* 5/(2MR) */
 
     double offset[3];
-    subV3(translation_2, translation_1, offset);
+    offset[0] = translation_2[0] - translation_1[0];
+    offset[1] = translation_2[1] - translation_1[1];
+    offset[2] = translation_2[2] - translation_1[2];
 
-    double offset_mag_sqrd = dotV3(offset, offset);
-    double offset_inv_mag  = 1.0 / sqrt(offset_mag_sqrd);
-    double forward[3];
+    double offset_mag_sqrd = fma(offset[0], offset[0], fma(offset[1], offset[1], offset[2] * offset[2]));
+
+    double offset_inv_mag = 1.0 / sqrt(offset_mag_sqrd);
+
+    // Accuracy impact!
+    // offset_inv_mag = _mm_cvtss_f32(_mm_rsqrt_ss(_mm_set_ss((float)offset_mag_sqrd)));
+
+    double forward[4];
     forward[0] = offset[0] * offset_inv_mag;
     forward[1] = offset[1] * offset_inv_mag;
     forward[2] = offset[2] * offset_inv_mag;
-
-    double up[3] = {0.0, 0.0, 1.0};
-    double right[3];
-    crossV3(forward, up, right);
+    forward[3] = -forward[0]; // right[1]
 
     /* ---------------- velocities to local frame ----------------------- */
-    double local_velocity_x_1      = dotV3(velocity_1,  right);
-    double local_velocity_y_1      = dotV3(velocity_1,  forward);
-    double local_velocity_x_2      = dotV3(velocity_2,  right);
-    double local_velocity_y_2      = dotV3(velocity_2,  forward);
+    double local_velocity_x_1      = fma(velocity_1[0], forward[1], velocity_1[1] * forward[3]);
+    double local_velocity_y_1      = fma(velocity_1[0], forward[0], fma(velocity_1[1], forward[1], velocity_1[2] * forward[2]));
+    double local_velocity_x_2      = fma(velocity_2[0], forward[1], velocity_2[1] * forward[3]);
+    double local_velocity_y_2      = fma(velocity_2[0], forward[0], fma(velocity_2[1], forward[1], velocity_2[2] * forward[2]));
 
     /* --------------- angular velocities to local frame ---------------- */
-    double local_angular_velocity_x_1 = dotV3(angular_velocity_1, right);
-    double local_angular_velocity_y_1 = dotV3(angular_velocity_1, forward);
-    double local_angular_velocity_z_1 = dotV3(angular_velocity_1, up);
+    double local_angular_velocity_x_1 = fma(angular_velocity_1[0], forward[1], angular_velocity_1[1] * forward[3]);
+    double local_angular_velocity_y_1 = fma(angular_velocity_1[0], forward[0], fma(angular_velocity_1[1], forward[1], angular_velocity_1[2] * forward[2]));
+    double local_angular_velocity_z_1 = angular_velocity_1[2];
 
-    double local_angular_velocity_x_2 = dotV3(angular_velocity_2, right);
-    double local_angular_velocity_y_2 = dotV3(angular_velocity_2, forward);
-    double local_angular_velocity_z_2 = dotV3(angular_velocity_2, up);
+    double local_angular_velocity_x_2 = fma(angular_velocity_2[0], forward[1], angular_velocity_2[1] * forward[3]);
+    double local_angular_velocity_y_2 = fma(angular_velocity_2[0], forward[0], fma(angular_velocity_2[1], forward[1], angular_velocity_2[2] * forward[2]));
+    double local_angular_velocity_z_2 = angular_velocity_2[2];
 
     /* ---------------- surface‑velocity helpers (use fma) -------------- */
     double surface_velocity_x_1 = fma(R, local_angular_velocity_y_1,  local_velocity_x_1);
@@ -1216,11 +1221,9 @@ DLL_EXPORT void recip_sqrt(double* rvw1, double* rvw2, float R, float M, float u
     */
 
     /* ---------------------- contact point slip ------------------------ */
-    double contact_point_velocity_x =  local_velocity_x_1 - local_velocity_x_2
-                                     - R*(local_angular_velocity_z_1 + local_angular_velocity_z_2);
+    double contact_point_velocity_x =  fma(-R, (local_angular_velocity_z_1 + local_angular_velocity_z_2),local_velocity_x_1 - local_velocity_x_2);
     double contact_point_velocity_z =  R*(local_angular_velocity_x_1 + local_angular_velocity_x_2);
-    double contact_inv_mag          = 1.0 / sqrt(contact_point_velocity_x*contact_point_velocity_x +
-                                                 contact_point_velocity_z*contact_point_velocity_z);
+    double contact_inv_mag          = 1.0 / sqrt(fma(contact_point_velocity_x,contact_point_velocity_x, contact_point_velocity_z*contact_point_velocity_z));
     double ball_ball_contact_point_magnitude =
         1.0 / contact_inv_mag;  /* keep original scalar around for profiling */
 
@@ -1357,18 +1360,25 @@ DLL_EXPORT void recip_sqrt(double* rvw1, double* rvw2, float R, float M, float u
     /* ---------------------- epilogue – UNCHANGED ----------------------- */
     /* ------------------------------------------------------------------ */
     START_PROFILE(after_loop);
-    for (int i = 0; i < 3; ++i) {
-        rvw1_result[i+3] = local_velocity_x_1*right[i] + local_velocity_y_1*forward[i];
-        rvw2_result[i+3] = local_velocity_x_2*right[i] + local_velocity_y_2*forward[i];
 
-        if (i < 2) {
-            rvw1_result[i+6] = local_angular_velocity_x_1*right[i] + local_angular_velocity_y_1*forward[i];
-            rvw2_result[i+6] = local_angular_velocity_x_2*right[i] + local_angular_velocity_y_2*forward[i];
-        } else {
-            rvw1_result[i+6] = local_angular_velocity_z_1;
-            rvw2_result[i+6] = local_angular_velocity_z_2;
-        }
-    }
+    rvw1_result[3] = fma(local_velocity_x_1, forward[1], local_velocity_y_1*forward[0]);
+    rvw2_result[3] = fma(local_velocity_x_2, forward[1], local_velocity_y_2*forward[0]);
+
+    rvw1_result[4] = fma(local_velocity_x_1, forward[3], local_velocity_y_1*forward[1]);
+    rvw2_result[4] = fma(local_velocity_x_2, forward[3], local_velocity_y_2*forward[1]);
+
+    rvw1_result[5] = local_velocity_y_1*forward[2];
+    rvw2_result[5] = local_velocity_y_2*forward[2];
+
+    rvw1_result[6] = fma(local_angular_velocity_x_1, forward[1],  local_angular_velocity_y_1*forward[0]);
+    rvw2_result[6] = fma(local_angular_velocity_x_2, forward[1], local_angular_velocity_y_2*forward[0]);
+
+    rvw1_result[7] = fma(local_angular_velocity_x_1, forward[3], local_angular_velocity_y_1*forward[1]);
+    rvw2_result[7] = fma(local_angular_velocity_x_2, forward[3], local_angular_velocity_y_2*forward[1]);
+
+    rvw1_result[8] = local_angular_velocity_z_1;
+    rvw2_result[8] = local_angular_velocity_z_2;
+
     END_PROFILE(after_loop);
     END_PROFILE(complete_function);
 }
