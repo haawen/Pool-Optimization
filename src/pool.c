@@ -1128,19 +1128,19 @@ DLL_EXPORT void approxsq_collide_balls(double* rvw1, double* rvw2, float R, floa
 /*
 double fast_inv_sqrt(double x, double z, int iterations) {
     if (x < 1e-16) return 0.0;
-    
+
     // Every 10th iteration use regular sqrt for better stability
     if (iterations % 10 == 0) {
         return 1.0 / sqrt(x);
     }
-    
+
     // Initial guess (using previous value)
     double y = z;
-    
+
     // Two Newton iterations
     y = y * (1.5 - (x * 0.5 * y * y));
     y = y * (1.5 - (x * 0.5 * y * y));
-    
+
     return y;
 }
 */
@@ -1214,7 +1214,7 @@ DLL_EXPORT void recip_sqrt(double* rvw1, double* rvw2, float R, float M, float u
     double surface_velocity_mag2_sq = surface_velocity_x_2*surface_velocity_x_2
                                     + surface_velocity_y_2*surface_velocity_y_2;
     */
-    
+
     /* ---------------------- contact point slip ------------------------ */
     double contact_point_velocity_x =  local_velocity_x_1 - local_velocity_x_2
                                      - R*(local_angular_velocity_z_1 + local_angular_velocity_z_2);
@@ -1252,8 +1252,7 @@ DLL_EXPORT void recip_sqrt(double* rvw1, double* rvw2, float R, float M, float u
             deltaP_x_1 = deltaP_y_1 = deltaP_x_2 = deltaP_y_2 = 0.0;
         } else {
             BRANCH(1);
-            double cbm2 = contact_point_velocity_x*contact_point_velocity_x
-                        + contact_point_velocity_z*contact_point_velocity_z;
+            double cbm2 = fma(contact_point_velocity_x, contact_point_velocity_x, contact_point_velocity_z*contact_point_velocity_z);
 
             // --- fast approx reciprocal sqrt of cbm2 ---
             // 1) approximate via double-precision Newton step on float rsqrt
@@ -1265,7 +1264,7 @@ DLL_EXPORT void recip_sqrt(double* rvw1, double* rvw2, float R, float M, float u
              );
             // refine to double precision: inv = r*(1.5 - 0.5*cbm2*r*r)
             double inv_cbm = (double)r;
-            inv_cbm = inv_cbm * (1.5 - 0.5 * cbm2 * inv_cbm * inv_cbm);
+            inv_cbm = inv_cbm * fma(inv_cbm * inv_cbm, -0.5 * cbm2, 1.5);
             // ------------------------------------------------------------
 
             deltaP_1 = -u_b * deltaP * contact_point_velocity_x * inv_cbm;
@@ -1283,12 +1282,11 @@ DLL_EXPORT void recip_sqrt(double* rvw1, double* rvw2, float R, float M, float u
                         deltaP_x_2 = deltaP_y_2 = 0.0;
                     } else {
                         BRANCH(6);
-                        double sv2sq = surface_velocity_x_2*surface_velocity_x_2
-                                     + surface_velocity_y_2*surface_velocity_y_2;
+                        double sv2sq = fma(surface_velocity_x_2, surface_velocity_x_2, surface_velocity_y_2*surface_velocity_y_2);
                         // fast rsqrt(sv2sq):
                         float fs = (float)sv2sq;
                         float rs = _mm_cvtss_f32(_mm_rsqrt_ss(_mm_set_ss((float)sv2sq)));
-                        double inv_sv2 = (double)rs * (1.5 - 0.5*sv2sq*rs*rs);
+                        double inv_sv2 = (double)rs * fma(rs*rs, -0.5*sv2sq, 1.5);
                         deltaP_x_2 = -u_s2 * surface_velocity_x_2 * inv_sv2 * deltaP_2;
                         deltaP_y_2 = -u_s2 * surface_velocity_y_2 * inv_sv2 * deltaP_2;
                     }
@@ -1300,12 +1298,11 @@ DLL_EXPORT void recip_sqrt(double* rvw1, double* rvw2, float R, float M, float u
                         deltaP_x_1 = deltaP_y_1 = 0.0;
                     } else {
                         BRANCH(9);
-                        double sv1sq = surface_velocity_x_1*surface_velocity_x_1
-                                     + surface_velocity_y_1*surface_velocity_y_1;
+                        double sv1sq = fma(surface_velocity_x_1,surface_velocity_x_1, surface_velocity_y_1*surface_velocity_y_1);
                         // fast rsqrt(sv1sq):
                         float ft = (float)sv1sq;
                         float rt = _mm_cvtss_f32(_mm_rsqrt_ss(_mm_set_ss((float)sv1sq)));
-                        double inv_sv1 = (double)rt * (1.5 - 0.5*sv1sq*rt*rt);
+                        double inv_sv1 = (double)rt *  fma(rt*rt, -0.5*sv1sq, 1.5);
                         deltaP_x_1 = u_s1 * surface_velocity_x_1 * inv_sv1 * deltaP_2;
                         deltaP_y_1 = u_s1 * surface_velocity_y_1 * inv_sv1 * deltaP_2;
                     }
@@ -1316,23 +1313,19 @@ DLL_EXPORT void recip_sqrt(double* rvw1, double* rvw2, float R, float M, float u
 
         /* ---- update linear & angular velocities ---- */
         START_PROFILE(delta);
-        double vcx1 = (deltaP_1 + deltaP_x_1) * invM;
-        double vcy1 = (-deltaP   + deltaP_y_1) * invM;
-        double vcx2 = (-deltaP_1 + deltaP_x_2) * invM;
-        double vcy2 = ( deltaP   + deltaP_y_2) * invM;
 
-        local_velocity_x_1 += vcx1;
-        local_velocity_y_1 += vcy1;
-        local_velocity_x_2 += vcx2;
-        local_velocity_y_2 += vcy2;
+        local_velocity_x_1 = fma(invM, (deltaP_1 + deltaP_x_1), local_velocity_x_1);
+        local_velocity_y_1 = fma(invM, deltaP_y_1-deltaP, local_velocity_y_1);
+        local_velocity_x_2 = fma(invM, deltaP_x_2 - deltaP_1, local_velocity_x_2);
+        local_velocity_y_2 = fma(invM, deltaP + deltaP_y_2, local_velocity_y_2);
 
-        local_angular_velocity_x_1 += C*(deltaP_2 + deltaP_y_1);
-        local_angular_velocity_y_1 += C*(-deltaP_x_1);
-        local_angular_velocity_z_1 += C*(-deltaP_1);
+        local_angular_velocity_x_1 = fma(C, (deltaP_2 + deltaP_y_1), local_angular_velocity_x_1);
+        local_angular_velocity_y_1 = fma(C, -deltaP_x_1, local_angular_velocity_y_1); // what about using fmsub?
+        local_angular_velocity_z_1 = fma(C, -deltaP_1, local_angular_velocity_z_1);
 
-        local_angular_velocity_x_2 += C*(deltaP_2 + deltaP_y_2);
-        local_angular_velocity_y_2 += C*(-deltaP_x_2);
-        local_angular_velocity_z_2 += C*(-deltaP_1);
+        local_angular_velocity_x_2 = fma(C, (deltaP_2 + deltaP_y_2), local_angular_velocity_x_2);
+        local_angular_velocity_y_2 = fma(C, -deltaP_x_2, local_angular_velocity_y_2);
+        local_angular_velocity_z_2 = fma(C, -deltaP_1, local_angular_velocity_z_2);
         END_PROFILE(delta);
 
         /* ---- recompute for next iteration ---- */
@@ -1343,21 +1336,19 @@ DLL_EXPORT void recip_sqrt(double* rvw1, double* rvw2, float R, float M, float u
         surface_velocity_y_2 = fma(-R, local_angular_velocity_x_2, local_velocity_y_2);
 
         // Newton‐step update for contact_inv_mag
-        contact_point_velocity_x = local_velocity_x_1 - local_velocity_x_2
-                                    - R*(local_angular_velocity_z_1 + local_angular_velocity_z_2);
+        contact_point_velocity_x = fma(-R, local_angular_velocity_z_1 + local_angular_velocity_z_2, local_velocity_x_1 - local_velocity_x_2);
         contact_point_velocity_z =  R*(local_angular_velocity_x_1 + local_angular_velocity_x_2);
-        contact_inv_mag *= 0.5 * (3.0
-          - (contact_point_velocity_x*contact_point_velocity_x
-           +contact_point_velocity_z*contact_point_velocity_z)
-            * contact_inv_mag*contact_inv_mag);
+
+        contact_inv_mag *= 0.5 * fma(-contact_inv_mag*contact_inv_mag, fma(contact_point_velocity_x, contact_point_velocity_x, contact_point_velocity_z*contact_point_velocity_z), 3.0);
+
         ball_ball_contact_point_magnitude = 1.0 / contact_inv_mag;
 
         double old_y = velocity_diff_y;
         velocity_diff_y = local_velocity_y_2 - local_velocity_y_1;
-        total_work += 0.5*deltaP*fabs(old_y + velocity_diff_y);
+        total_work = fma(0.5*deltaP, fabs(old_y + velocity_diff_y), total_work);
         if (work_compression == 0.0 && velocity_diff_y > 0.0) {
             work_compression = total_work;
-            work_required    = (1.0 + e_b*e_b)*work_compression;
+            work_required    = (fma(e_b, e_b, 1.0))*work_compression;
         }
         END_PROFILE(velocity);
     }
@@ -3238,7 +3229,7 @@ DLL_EXPORT void code_motion_register_relieve(double* rvw1, double* rvw2, float R
     sv2y  = local_vel_2[1] - R * local_ang_2[0];
     sv1sq = sv1x*sv1x + sv1y*sv1y;
     sv2sq = sv2x*sv2x + sv2y*sv2y;
-    
+
     END_PROFILE(before_loop);
     while (velocity_diff_y < 0 || total_work < work_required) {
 
@@ -4012,15 +4003,15 @@ DLL_EXPORT void improved_symmetry_collide_balls(double* rvw1, double* rvw2, floa
     double angular_1_dot_right = dotV3(angular_velocity_1, right);
     double angular_1_dot_forward = dotV3(angular_velocity_1, forward);
     double angular_1_dot_up = dotV3(angular_velocity_1, up);
-    
+
     double local_angular_velocity_x_1 = angular_1_dot_right;
     double local_angular_velocity_y_1 = angular_1_dot_forward;
     double local_angular_velocity_z_1 = angular_1_dot_up;
 
     double angular_2_dot_right = dotV3(angular_velocity_2, right);
-    double angular_2_dot_forward = dotV3(angular_velocity_2, forward);  
+    double angular_2_dot_forward = dotV3(angular_velocity_2, forward);
     double angular_2_dot_up = dotV3(angular_velocity_2, up);
-    
+
     double local_angular_velocity_x_2 = angular_2_dot_right;
     double local_angular_velocity_y_2 = angular_2_dot_forward;
     double local_angular_velocity_z_2 = angular_2_dot_up;
@@ -4053,7 +4044,7 @@ DLL_EXPORT void improved_symmetry_collide_balls(double* rvw1, double* rvw2, floa
     double deltaP_x_1 = 0, deltaP_y_1 = 0, deltaP_x_2 = 0, deltaP_y_2 = 0;
 
     END_PROFILE(before_loop);
-    
+
     // Use original loop with branching
     while (velocity_diff_y < 0.0 || total_work < work_required) {
         START_PROFILE(impulse);
@@ -4084,7 +4075,7 @@ DLL_EXPORT void improved_symmetry_collide_balls(double* rvw1, double* rvw2, floa
                         deltaP_x_2 = deltaP_y_2 = 0.0;
                     } else {
                         BRANCH(6);
-                        double inv_sv2 = 1.0 / sqrt(surface_velocity_x_2 * surface_velocity_x_2 + 
+                        double inv_sv2 = 1.0 / sqrt(surface_velocity_x_2 * surface_velocity_x_2 +
                                                   surface_velocity_y_2 * surface_velocity_y_2);
                         deltaP_x_2 = -u_s2 * surface_velocity_x_2 * inv_sv2 * deltaP_2;
                         deltaP_y_2 = -u_s2 * surface_velocity_y_2 * inv_sv2 * deltaP_2;
@@ -4097,7 +4088,7 @@ DLL_EXPORT void improved_symmetry_collide_balls(double* rvw1, double* rvw2, floa
                         deltaP_x_1 = deltaP_y_1 = 0.0;
                     } else {
                         BRANCH(9);
-                        double inv_sv1 = 1.0 / sqrt(surface_velocity_x_1*surface_velocity_x_1 + 
+                        double inv_sv1 = 1.0 / sqrt(surface_velocity_x_1*surface_velocity_x_1 +
                                                   surface_velocity_y_1*surface_velocity_y_1);
                         deltaP_x_1 = u_s1 * surface_velocity_x_1 * inv_sv1 * deltaP_2;
                         deltaP_y_1 = u_s1 * surface_velocity_y_1 * inv_sv1 * deltaP_2;
@@ -4109,7 +4100,7 @@ DLL_EXPORT void improved_symmetry_collide_balls(double* rvw1, double* rvw2, floa
 
         // Keep the same velocity update logic
         START_PROFILE(delta);
-        
+
         // Calculate velocity changes
         double velocity_change_x_1 = (deltaP_1 + deltaP_x_1) * invM;
         double velocity_change_y_1 = (-deltaP + deltaP_y_1) * invM;
@@ -4135,7 +4126,7 @@ DLL_EXPORT void improved_symmetry_collide_balls(double* rvw1, double* rvw2, floa
 
         // Recompute surface velocities
         START_PROFILE(velocity);
-        
+
         surface_velocity_x_1 = fma(R, local_angular_velocity_y_1, local_velocity_x_1);
         surface_velocity_y_1 = fma(-R, local_angular_velocity_x_1, local_velocity_y_1);
         surface_velocity_x_2 = fma(R, local_angular_velocity_y_2, local_velocity_x_2);
@@ -4145,10 +4136,10 @@ DLL_EXPORT void improved_symmetry_collide_balls(double* rvw1, double* rvw2, floa
         contact_point_velocity_x = local_velocity_x_1 - local_velocity_x_2
                                  - (local_angular_velocity_z_1 + local_angular_velocity_z_2)*R;
         contact_point_velocity_z = (local_angular_velocity_x_1 + local_angular_velocity_x_2)*R;
-        
+
         // Use original approximation formula for consistency
         contact_inv_mag *= 0.5 * (3.0 - (contact_point_velocity_x * contact_point_velocity_x +
-                           contact_point_velocity_z * contact_point_velocity_z) * 
+                           contact_point_velocity_z * contact_point_velocity_z) *
                            contact_inv_mag * contact_inv_mag);
         ball_ball_contact_point_magnitude = 1.0 / contact_inv_mag;
 
@@ -4696,4 +4687,3 @@ DLL_EXPORT void simd_scalar_loop(double* rvw1, double* rvw2, float R, float M, f
     END_PROFILE(after_loop);
     END_PROFILE(complete_function);
 }
-
