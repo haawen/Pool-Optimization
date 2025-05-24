@@ -1507,7 +1507,7 @@ DLL_EXPORT void recip_sqrt_less_if(double* rvw1, double* rvw2, float R, float M,
                     surface_velocity_y_2 * surface_velocity_y_2);
         fs = (float)sv2sq;
         rs = _mm_cvtss_f32(_mm_rsqrt_ss(_mm_set_ss(fs)));
-        inv_sv2 = (double)rs * fma(rs * rs, -0.5 * sv2sq, 1.5);
+        inv_sv2 = rs * fma(rs * rs, -0.5 * sv2sq, 1.5);
 
         deltaP_x_2.d = -u_s2 * surface_velocity_x_2 * inv_sv2 * deltaP_2.d;
         deltaP_y_2.d = -u_s2 * surface_velocity_y_2 * inv_sv2 * deltaP_2.d;
@@ -1516,31 +1516,25 @@ DLL_EXPORT void recip_sqrt_less_if(double* rvw1, double* rvw2, float R, float M,
                     surface_velocity_y_1 * surface_velocity_y_1);
         ft = (float)sv1sq;
         rt = _mm_cvtss_f32(_mm_rsqrt_ss(_mm_set_ss(ft)));
-        inv_sv1 = (double)rt * fma(rt * rt, -0.5 * sv1sq, 1.5);
+        inv_sv1 = rt * fma(rt * rt, -0.5 * sv1sq, 1.5);
 
         deltaP_x_1.d = u_s1 * surface_velocity_x_1 * inv_sv1 * deltaP_2.d;
         deltaP_y_1.d = u_s1 * surface_velocity_y_1 * inv_sv1 * deltaP_2.d;
 
-        if (unlikely(ball_ball_contact_point_magnitude < 1e-16)) {
-            BRANCH(0);
-            deltaP_1.d = deltaP_2.d = 0.0;
-            deltaP_x_1.d = deltaP_y_1.d = deltaP_x_2.d = deltaP_y_2.d = 0.0;
-        } else {
-            if (unlikely(fabs(contact_point_velocity_z) < 1e-16)) {
-                deltaP_2.d = deltaP_x_1.d = deltaP_y_1.d = deltaP_x_2.d = deltaP_y_2.d = 0.0;
-            } else {
-                if (deltaP_2.d > 0.0) {
-                    deltaP_x_1.d = deltaP_y_1.d = 0.0;
-                    if (unlikely(surface_velocity_x_2 == 0.0 && surface_velocity_y_2 == 0)) {
-                        deltaP_x_2.d = deltaP_y_2.d = 0.0;
-                    }
-                } else {
+        if (likely(fabs(contact_point_velocity_z) >= 1e-16)) {
+            if (deltaP_2.d > 0.0) {
+                deltaP_x_1.d = deltaP_y_1.d = 0.0;
+                if (unlikely(surface_velocity_x_2 == 0.0 && surface_velocity_y_2 == 0)) {
                     deltaP_x_2.d = deltaP_y_2.d = 0.0;
-                    if (unlikely(surface_velocity_x_1 == 0.0 && surface_velocity_y_1 == 0)) {
-                        deltaP_x_1.d = deltaP_y_1.d = 0.0;
-                    }
+                }
+            } else {
+                deltaP_x_2.d = deltaP_y_2.d = 0.0;
+                if (unlikely(surface_velocity_x_1 == 0.0 && surface_velocity_y_1 == 0)) {
+                    deltaP_x_1.d = deltaP_y_1.d = 0.0;
                 }
             }
+        } else {
+            deltaP_2.d = deltaP_x_1.d = deltaP_y_1.d = deltaP_x_2.d = deltaP_y_2.d = 0.0;
         }
 
         END_PROFILE(impulse);

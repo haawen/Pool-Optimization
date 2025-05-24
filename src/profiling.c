@@ -5,9 +5,9 @@
 #include "unity.h"
 #include "pool.h"
 
-#define WARMUP 1000
+#define WARMUP 0
 #define ITERATIONS 10000
-#define TEST_RUNNER_ITERATIONS 10 // Rerun all TestCases (so warmup + iterations) in Random Order
+#define TEST_RUNNER_ITERATIONS 3 // Rerun all TestCases (so warmup + iterations) in Random Order
 #define FLUSH_SIZE (32 * 1024 * 1024)  // 32MB buffer
 
 #ifdef PROFILE
@@ -395,17 +395,17 @@ int main() {
     srand((unsigned int)time(NULL));
 
     void (*tests[])(void) = {
-        test_collide_balls_basic,
-        test_scalar_sqrt,
-        test_collide_balls_simd,
-        test_simd_collide_ball_2,
-        test_improved_symmetry,
-        test_collide_balls_simd2,
-        test_collide_balls_simd3,
-        test_register_relieve,
-        test_collide_balls_code_motion,
+        // test_collide_balls_basic,
+        // test_scalar_sqrt,
+        // test_collide_balls_simd,
+        // test_simd_collide_ball_2,
+        // test_improved_symmetry,
+        // test_collide_balls_simd2,
+        // test_collide_balls_simd3,
+        // test_register_relieve,
+        // test_collide_balls_code_motion,
 
-         test_approx_symmetry,
+         // test_approx_symmetry,
          test_recip_sqrt_less_ifs
     };
 
