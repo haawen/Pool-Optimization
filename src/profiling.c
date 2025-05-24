@@ -389,10 +389,22 @@ int main() {
         test_approx_sqrt,
         test_approx_symmetry,
         test_collide_balls_simd,
+        test_collide_balls_code_motion,
         //test_simd_collide_ball_2,
         //test_improved_symmetry,
         test_collide_balls_simd2,
         test_collide_balls_simd3,
+    };
+
+    const char* function_names[] = {
+        "Basic Implementation",
+        "Scalar Less SQRT",
+        "scalar Less SQRT + Approx",
+        "Approx + Symmetry",
+        "SIMD",
+        "Code Motion",
+        "Full SIMD",
+        "SIMD scalar loop"
     };
 
     #define NUM_FUNCTIONS (sizeof(tests) / sizeof(tests[0]))
@@ -408,9 +420,13 @@ int main() {
                 void (*tmp)(void) = tests[i];
                 tests[i] = tests[j];
                 tests[j] = tmp;
+                const char* tmp_name = function_names[i];
+                function_names[i] = function_names[j];
+                function_names[j] = tmp_name;
             }
 
             for (int i = 0; i < NUM_FUNCTIONS; i++) {
+                printf("\n--- Running test %d: %s ---\n", i, function_names[i]);
                 RUN_TEST(tests[i]);
             }
 
