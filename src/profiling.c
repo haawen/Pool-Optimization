@@ -353,6 +353,10 @@ void test_recip_sqrt_ifs(void) {
     call_function("Reciprocal Sqrt IF", recip_sqrt_better_ifs);
 }
 
+void test_recip_sqrt_less_ifs(void) {
+    call_function("Reciprocal Sqrt Less IF", recip_sqrt_less_if);
+}
+
 void test_collide_balls_simd(void) {
     call_function("SIMD", simd_collide_balls);
 }
@@ -393,7 +397,7 @@ int main() {
     void (*tests[])(void) = {
         // test_collide_balls_basic,
         // test_scalar_sqrt,
-        // test_approx_sqrt,
+        // test_approx_sqrtifs,
         // test_collide_balls_simd,
         // test_simd_collide_ball_2,
         // test_improved_symmetry,
@@ -403,7 +407,7 @@ int main() {
         // test_collide_balls_code_motion,
 
          test_approx_symmetry,
-         test_recip_sqrt_ifs
+         test_recip_sqrt_less_ifs
     };
 
     #define NUM_FUNCTIONS (sizeof(tests) / sizeof(tests[0]))
