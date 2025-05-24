@@ -32,6 +32,7 @@ set(FLAGS
     -ftree-vectorize
     -fno-omit-frame-pointer
     #-flto          # Worsens
+    -g
 )
 
 add_library(pool_shared SHARED ${SOURCES})

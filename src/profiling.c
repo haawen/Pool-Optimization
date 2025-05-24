@@ -5,9 +5,9 @@
 #include "unity.h"
 #include "pool.h"
 
-#define WARMUP 1000
+#define WARMUP 0
 #define ITERATIONS 10000
-#define TEST_RUNNER_ITERATIONS 10 // Rerun all TestCases (so warmup + iterations) in Random Order
+#define TEST_RUNNER_ITERATIONS 3 // Rerun all TestCases (so warmup + iterations) in Random Order
 #define FLUSH_SIZE (32 * 1024 * 1024)  // 32MB buffer
 
 #ifdef PROFILE
@@ -349,6 +349,13 @@ void test_approx_sqrt(void) {
 void test_approx_symmetry(void) {
     call_function("Reciprocal Sqrt", recip_sqrt);
 }
+void test_recip_sqrt_ifs(void) {
+    call_function("Reciprocal Sqrt IF", recip_sqrt_better_ifs);
+}
+
+void test_recip_sqrt_less_ifs(void) {
+    call_function("Reciprocal Sqrt Less IF", recip_sqrt_less_if);
+}
 
 void test_collide_balls_simd(void) {
     call_function("SIMD", simd_collide_balls);
@@ -399,6 +406,8 @@ int main() {
         test_collide_balls_simd2,
         test_collide_balls_simd3,
         test_register_relieve,
+        test_recip_sqrt_ifs,
+        test_recip_sqrt_less_ifs
     };
 
     const char* function_names[] = {
@@ -412,7 +421,9 @@ int main() {
         "Improved Symmetry",
         "Full SIMD",
         "SIMD scalar loop",
-        "Register Relieve"
+        "Register Relieve",
+        "Reciprocal Sqrt IF",
+        "Reciprocal Sqrt Less IF"
     };
 
     #define NUM_FUNCTIONS (sizeof(tests) / sizeof(tests[0]))
