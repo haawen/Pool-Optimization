@@ -72,13 +72,11 @@ typedef __m256d v3d;                   /* 4 doubles, but we use only 3 */
 /* horizontal add of x,y,z : result in lowest lane */
 static inline double v3d_dot(v3d a, v3d b)
 {
-    __m256d prod = _mm256_mul_pd(a, b);                   /* [0,z*y,y*y,x*x] */
-    __m128d hi   = _mm256_extractf128_pd(prod, 1);        /* z*y | _        */
-    __m128d lo   = _mm256_castpd256_pd128(prod);          /* y*y | x*x      */
-    __m128d sum1 = _mm_add_pd(lo, hi);                    /* y*y+z*y | x*x  */
-    __m128d shuf = _mm_shuffle_pd(sum1, sum1, 0b01);      /* swap lanes     */
-    __m128d dot  = _mm_add_pd(sum1, shuf);                /* x*x+y*y+z*z|dup*/
-    return _mm_cvtsd_f64(dot);
+    __m256d prod = _mm256_mul_pd(a, b);                             // prod = [ax*bx, ay*by, az*bz, _*_]
+    __m256d sum = _mm256_hadd_pd(prod, prod);                       // sum = [(ax*bx + ay*by), (az*bz + _*_), (ax*bx + ay*by), (az*bz + _*_)]
+    double low = _mm_cvtsd_f64(_mm256_castpd256_pd128(sum));        // low = (ax*bx + ay*by)
+    double high = _mm_cvtsd_f64(_mm256_extractf128_pd(sum, 1));     // high = (az*bz + _*_)
+    return low + high;                                              // Result = (ax*bx + ay*by) + (az*bz)
 }
 
 static inline v3d v3d_cross(v3d a, v3d b)
@@ -94,8 +92,7 @@ static inline v3d v3d_cross(v3d a, v3d b)
     const __m256d qb = _mm256_permute4x64_pd(b, _MM_SHUFFLE(3,1,0,2));
 
     /* cross = P(a)*Q(b) − Q(a)*P(b) */
-    return _mm256_sub_pd(_mm256_mul_pd(pa, qb),
-                         _mm256_mul_pd(qa, pb));
+    return _mm256_fmsub_pd(pa, qb, _mm256_mul_pd(qa, pb));
 }
 
 /* ------------ helpers to get/set lane 0 / 1 from an __m128d -------- */

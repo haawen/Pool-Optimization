@@ -45,6 +45,7 @@ color_styles = {
     "Scalar Improvements": "red",
     "Scalar Less SQRT": "firebrick",
     "scalar Less SQRT + Approx": "Cyan",
+    "Approx + Symmetry": "DarkOrange",
     "Reciprocal Sqrt": "DarkOrange",
     "Reciprocal Sqrt IF": "white",
     "Reciprocal Sqrt Less IF": "chocolate",

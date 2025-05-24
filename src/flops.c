@@ -235,14 +235,13 @@ int main() {
     setUp();
 
     call_function("Basic Implementation", collide_balls);
-    call_function("Less SQRT", less_sqrt_collide_balls);
     call_function("Scalar Less SQRT", scalar_less_sqrt);
-    call_function("Precompute", simple_precompute_cb);
-    call_function("Branch Pred", branch_prediction_collide_balls);
-    call_function("Removed Unused Branches", remove_unused_branches);
-    call_function("Code Motion", code_motion_collide_balls2);
+    call_function("scalar Less SQRT + Approx", approxsq_collide_balls);
+    call_function("Approx + Symmetry", recip_sqrt);
     call_function("SIMD", simd_collide_balls);
-    call_function("SIMD Optimized Impulse", simd_collide_ball_2);
+    call_function("Code Motion", code_motion_collide_balls2);
+    call_function("Full SIMD", simd_collide_ball_2);
+    call_function("SIMD scalar loop", simd_scalar_loop);
 
     return 0;
 }
