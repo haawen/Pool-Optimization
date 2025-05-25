@@ -19,7 +19,7 @@
 #include <intrin.h>
 
 	#define myInt64 signed __int64
-	#define INT32 unsigned __int32
+	// #define INT32 unsigned __int32
 
 #endif
 
