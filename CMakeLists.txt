@@ -22,11 +22,9 @@ set(FLAGS
     -mfma
     -mavx2
     -Ofast
-    -ffast-math
     # #-march=native # unpredictable, most of the times worsens
     # -Wall
     # -pedantic
-    # -mfma
     -fno-math-errno
     -funroll-loops
     -ftree-vectorize
@@ -58,6 +56,16 @@ target_compile_options(single_performance PRIVATE
 add_executable(flops src/flops.c ${SOURCES})
 target_compile_definitions(flops PRIVATE PROFILE FLOP_COUNT)
 target_compile_options(flops PRIVATE ${FLAGS})
+
+add_custom_target(collide_balls_asm
+  COMMAND ${CMAKE_C_COMPILER}
+          ${FLAGS}
+          -I${CMAKE_SOURCE_DIR}/include
+          -I${CMAKE_SOURCE_DIR}/${UNITY_DIR}
+          -S
+          -o ${CMAKE_BINARY_DIR}/pool.s
+          ${CMAKE_SOURCE_DIR}/src/pool.c
+)
 
 if(UNIX)
     target_link_libraries(pool_shared m)
