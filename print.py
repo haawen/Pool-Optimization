@@ -19,7 +19,7 @@ def main():
     df["Test Case"] = "TC " + df["Test Case"].astype(str)
     df.columns = df.columns.str.strip()
 
-    # 2) pivot with 10%-trimmed mean
+    # 2) pivot with 10% trimmed mean
     cycles = df.pivot_table(
         index="Function",
         columns="Test Case",
@@ -33,7 +33,7 @@ def main():
     # 4) rank per test‐case (1 = highest cycle count)
     ranks = cycles.rank(ascending=False, method="min")
 
-    # 5) compute mean rank & reverse it so larger ⇒ worse
+    # 5) compute mean rank & reverse it so larger is worse
     mean_rank = ranks.mean(axis=1)
     rev_rank  = (len(mean_rank) + 1) - mean_rank
 

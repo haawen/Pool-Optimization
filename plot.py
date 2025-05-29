@@ -56,7 +56,7 @@ color_styles = {
     "Register Relieve": "DarkSlateGray",
 }
 
-fig, ax = plt.subplots(figsize=(12, 6))  # ✅ This gives both fig and ax
+fig, ax = plt.subplots(figsize=(12, 6))  # This gives both fig and ax
 x = np.arange(len(benchmark["Test Case"].value_counts()))
 cols = []
 ranking = {}
@@ -119,7 +119,7 @@ plt.close()
 
 ## Cost
 for opi, op in enumerate(["ADDS", "MULS", "DIVS", "SQRT"]):
-    fig, ax = plt.subplots(figsize=(12, 6))  # ✅ This gives both fig and ax
+    fig, ax = plt.subplots(figsize=(12, 6))  # This gives both fig and ax
 
     cols = []
     x = np.arange(len(flops["Section"].value_counts()))
@@ -228,7 +228,7 @@ bar_plot_by_testcase("FlopsPerCycle", log=False, roundv=False)
 for f, data in flops.groupby("Function"):
     groups = data.groupby(["Section"])[["ADDS", "MULS", "DIVS", "SQRT"]].mean()
 
-    fig, ax = plt.subplots(figsize=(12, 6))  # ✅ This gives both fig and ax
+    fig, ax = plt.subplots(figsize=(12, 6))  # This gives both fig and ax
 
     width = 0.1
 

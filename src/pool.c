@@ -5250,322 +5250,6 @@ DLL_EXPORT void improved_symmetry_collide_balls(double *rvw1, double *rvw2, floa
     __asm volatile("# LLVM-MCA-END" ::: "memory");
 }
 
-// https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html
-DLL_EXPORT void simd_collide_ball_2(double *rvw1, double *rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double *rvw1_result, double *rvw2_result, Profile *profiles, Branch *branches)
-{
-    __asm volatile("# LLVM-MCA-BEGIN simd_collide_ball_2" ::: "memory");
-#ifdef PROFILE
-    Profile *complete_function = &profiles[0];
-    Profile *before_loop = &profiles[1];
-    Profile *impulse = &profiles[2];
-    Profile *delta = &profiles[3];
-    Profile *velocity = &profiles[4];
-    Profile *after_loop = &profiles[5];
-#endif
-
-    START_PROFILE(complete_function);
-    START_PROFILE(before_loop);
-
-    // Altough the memory is not really loaded here, assuming its only compulsary misses
-    MEMORY(18, complete_function, before_loop);
-    double *translation_1 = rvw1;
-    double *velocity_1 = &rvw1[3];
-    double *angular_velocity_1 = &rvw1[6];
-
-    double *translation_2 = rvw2;
-    double *velocity_2 = &rvw2[3];
-    double *angular_velocity_2 = &rvw2[6];
-
-    FLOPS(3, 0, 0, 0, complete_function, before_loop);
-    double forward[3]; // Forward from ball 1 to ball 2, normalized, forard[2] will always be zero
-    forward[0] = translation_2[0] - translation_1[0];
-    forward[1] = translation_2[1] - translation_1[1];
-
-    FLOPS(2, 3, 0, 0, complete_function, before_loop);
-    double offset_mag = forward[0] * forward[0] + forward[1] * forward[1];
-
-    FLOPS(0, 0, 0, 1, complete_function, before_loop);
-    offset_mag = sqrt(offset_mag);
-
-    FLOPS(0, 0, 3, 0, complete_function, before_loop);
-    forward[0] = forward[0] / offset_mag;
-    forward[1] = forward[1] / offset_mag;
-
-    FLOPS(1, 0, 0, 0, complete_function, before_loop);
-    forward[2] = -forward[0]; // This is the same as right[1]
-
-    // From here on, it is assumed that the x axis is the right axis and y axis is the forward axis
-    // Transform velocities to local frame
-    FLOPS(2, 4, 0, 0, complete_function, before_loop);
-    double _local_velocity_x_1 = velocity_1[0] * forward[1] + velocity_1[1] * forward[2];
-    double _local_velocity_x_2 = velocity_2[0] * forward[1] + velocity_2[1] * forward[2];
-
-    FLOPS(2, 4, 0, 0, complete_function, before_loop);
-    double _local_velocity_y_1 = velocity_1[0] * forward[0] + velocity_1[1] * forward[1];
-    double _local_velocity_y_2 = velocity_2[0] * forward[0] + velocity_2[1] * forward[1];
-
-    // Transform angular velocities into local frame
-
-    FLOPS(2, 4, 0, 0, complete_function, before_loop);
-    double _local_angular_velocity_x_1 = angular_velocity_1[0] * forward[1] + angular_velocity_1[1] * forward[2];
-    double _local_angular_velocity_x_2 = angular_velocity_2[0] * forward[1] + angular_velocity_2[1] * forward[2];
-
-    FLOPS(2, 4, 0, 0, complete_function, before_loop);
-    double _local_angular_velocity_y_1 = angular_velocity_1[0] * forward[0] + angular_velocity_1[1] * forward[1];
-    double _local_angular_velocity_y_2 = angular_velocity_2[0] * forward[0] + angular_velocity_2[1] * forward[1];
-
-    double _local_angular_velocity_z_1 = angular_velocity_1[2];
-    double _local_angular_velocity_z_2 = angular_velocity_2[2];
-
-    // SIMD Prep
-    // [x1, y1, x2, y2]
-    __m256d velocities = _mm256_set_pd(_local_velocity_y_2, _local_velocity_x_2, _local_velocity_y_1, _local_velocity_x_1);
-
-    // [y1, x1, y2, x2] !!! ! Y is first such that we can skip reorderring before surface calculation
-    __m256d angular = _mm256_set_pd(_local_angular_velocity_x_2, _local_angular_velocity_y_2, _local_angular_velocity_x_1, _local_angular_velocity_y_1);
-    // [0, 0, wz1, wz2]
-    __m256d angular_z = _mm256_set_pd(_local_angular_velocity_z_2, _local_angular_velocity_z_1, 0, 0);
-
-    __m256d R_ALTERNATE_4 = _mm256_set_pd((double)(-R), (double)R, (double)(-R), R); // TODO: could use fm_addsub instead of this?
-    __m256d R4 = _mm256_set1_pd((double)R);
-    __m256d M4 = _mm256_set1_pd((double)M);
-    // [x1, y1, x2, y2]
-    __m256d surface_velocities = _mm256_fmadd_pd(R_ALTERNATE_4, angular, velocities);
-
-    FLOPS(5, 4, 0, 1, complete_function, before_loop);
-
-    // printf("\nC Contact Point Slide, Spin:\n");
-    // printf("  Contact Point: u_ijC_xz_mag= %.6f\n", ball_ball_contact_point_magnitude);
-
-    // deltaP is most likely always 0?
-    // ΔP represents the Impulse during a time of Δt
-    double velocity_diff_y = _local_velocity_y_2 - _local_velocity_y_1;
-    if (deltaP == 0)
-    {
-        deltaP = 0.5 * (1.0 + e_b) * M * fabs(velocity_diff_y) / (double)(N);
-    }
-
-    __m256d deltaP4 = _mm256_set1_pd(deltaP);
-    __m256d nub4 = _mm256_set1_pd(-u_b);
-
-    double C = 5.0 / (2.0 * M * R);
-    __m256d C4 = _mm256_set1_pd(C);
-    __m256d NC4 = _mm256_set1_pd(-C);
-
-    double total_work = 0;           // Work done due to impulse force
-    double work_required = INFINITY; // Total amount of work required before collision handling is complete
-    double work_compression = 0;
-
-    END_PROFILE(before_loop);
-
-    // while (__builtin_expect(velocity_diff_y < 0 || total_work < work_required, true)) {
-
-    while (__builtin_expect(velocity_diff_y < 0 || total_work < work_required, true))
-    {
-
-        //[x1, wx1, x2, wx2]
-        __m256d lower = _mm256_blend_pd(velocities, angular, 0b1010);
-        // [x2, wx2, undefined, undefined]
-        __m256d upper = _mm256_castpd128_pd256(_mm256_extractf128_pd(lower, 1));
-
-        //[x1, wx1, undef, wz1]
-        lower = _mm256_blend_pd(lower, _mm256_shuffle_pd(angular_z, angular_z, 0b0010), 0b1000);
-        //[x2, wx2, undef, wz2]
-        upper = _mm256_blend_pd(upper, angular_z, 0b1000);
-
-        // [x1 - x2, wx1 + wx2, undefined, wz1 + wz2]
-        __m256d sums = _mm256_addsub_pd(lower, upper);
-
-        // [undefined, contact point z (velocity / angular?), undefiend, undefined]
-        __m256d contact_point_z = _mm256_mul_pd(R4, sums);
-
-        // [wz1 + wz2, undef, undef, undef]
-        __m256d contact_point_x_prep = _mm256_permute_pd(_mm256_castpd128_pd256(_mm256_extractf128_pd(sums, 1)), 0b1011);
-        // [contact_point_x, undef, undef, undef]
-        __m256d contact_point_x = _mm256_fnmadd_pd(R4, contact_point_x_prep, sums);
-
-        // [contact_point_x, contact_point_z, undef, undef]
-        __m256d contact_point = _mm256_blend_pd(contact_point_x, contact_point_z, 0b1010);
-
-        // double contact_point_velocity_x = _local_velocity_x_1 - _local_velocity_x_2 - R * (_local_angular_velocity_z_1 + local_angular_velocity_z_2);
-        // double contact_point_velocity_z = R * (_local_angular_velocity_x_1 + _local_angular_velocity_x_2);
-
-        __m256d surf_sqrd = _mm256_mul_pd(surface_velocities, surface_velocities);
-        __m256d contact_point_sqrd = _mm256_mul_pd(contact_point, contact_point);
-
-        // [surfx1 * surfx1, contz * contz, surfx2*surfx2, undef]
-        __m256d sqrd_lhs = _mm256_blend_pd(surf_sqrd, contact_point_sqrd, 0b0010);
-
-        // [surfy1 * surfy1, undef, surfy2*surfy2, undef]
-        __m256d sqrd_rhs = _mm256_shuffle_pd(surf_sqrd, surf_sqrd, 0b1111);
-
-        // [surfy1 * surfy1, contx * contx, surfy2*surfy2, undef]
-        sqrd_rhs = _mm256_blend_pd(sqrd_rhs, _mm256_shuffle_pd(contact_point_sqrd, contact_point_sqrd, 0b1000), 0b0010);
-
-        // [surfx1 * surfx1 + surfy1*surfy1, contx*contx+contz*contz, surfx2 * surfx2 + surfy2*surfy2, undef]
-        __m256d final_surf_sqrd = _mm256_add_pd(sqrd_lhs, sqrd_rhs);
-
-        // [surf 1 magnitude, contact point magnitude, surf 2 magnitude]
-        __m256d sqrts = _mm256_sqrt_pd(final_surf_sqrd);
-
-        BRANCH(11);
-        START_PROFILE(impulse);
-
-        __m256d deltaP_12 = _mm256_div_pd(contact_point, _mm256_shuffle_pd(sqrts, sqrts, 0b1011));
-
-        // [deltaP_1, deltaP_2, undef, undef]
-        deltaP_12 = _mm256_mul_pd(nub4, _mm256_mul_pd(deltaP4, deltaP_12));
-
-        __m256d surf_norm = _mm256_div_pd(surface_velocities, _mm256_shuffle_pd(sqrts, sqrts, 0b0000));
-
-        __m256d u_s4 = _mm256_set_pd(-u_s2, -u_s2, u_s1, u_s1);
-
-        // [deltaP_2 * 4]
-        __m256d deltaP_2_4 = _mm256_permute4x64_pd(deltaP_12, 0b01010101);
-        // [deltaP_x_1, deltaP_y_1, deltaP_x_2, deltaP_y_2]
-        __m256d deltaP_xy12 = _mm256_mul_pd(u_s4, _mm256_mul_pd(surf_norm, deltaP_2_4));
-
-        // _mm256_set_pd(0.0, deltaP_2_4, fabs(contact_point_velocity_z), ball_ball_contact_point_magnitude);
-        __m256d impulse_rhs = _mm256_setzero_pd();
-        impulse_rhs = _mm256_blend_pd(impulse_rhs, deltaP_2_4, 0b0100);
-
-        // fabs
-        __m256d abs_mask = _mm256_castsi256_pd(_mm256_set1_epi64x(0x7FFFFFFFFFFFFFFF));
-        __m256d abs_contact = _mm256_and_pd(contact_point, abs_mask);
-        impulse_rhs = _mm256_blend_pd(impulse_rhs, abs_contact, 0b0010);
-        impulse_rhs = _mm256_blend_pd(impulse_rhs, _mm256_shuffle_pd(sqrts, sqrts, 0b0011), 0b0001);
-
-        // _mm256_set_pd(0.0, 0.0, 1e-16, 1e-16);
-        __m256d impulse_lhs = _mm256_set_pd(0.0, 0.0, 1e-16, 1e-16);
-
-        // [ball_ball_contact_point_magnitude > 1e-16, fabs(contact_point_velocity_z) > 1e-16, deltaP_2 > 0, undef]
-        __m256d impulse_mask = _mm256_cmp_pd(impulse_lhs, impulse_rhs, _CMP_LT_OQ);
-        // [surface_vel_mag1 != 0, undef, surface_vel_mag2 != 0, undef]
-        __m256d impulse_mask_2 = _mm256_cmp_pd(sqrts, _mm256_setzero_pd(), _CMP_NEQ_OQ);
-        // [surface_vel_mag1 != 0 ** 2, surface_vel_mag2 != 0**2]
-        impulse_mask_2 = _mm256_shuffle_pd(impulse_mask_2, impulse_mask_2, 0b0000);
-
-        // Expensive part? 9 cycles...
-        __m256d contact_mag_mask = _mm256_permute4x64_pd(impulse_mask, 0b00000000);
-        __m256d contact_z_mask = _mm256_permute4x64_pd(impulse_mask, 0b01010101);
-        __m256d deltaP_2_mask = _mm256_permute4x64_pd(impulse_mask, 0b10101010);
-
-        __m256d flip_mask = _mm256_castsi256_pd(_mm256_set_epi64x(0, 0, 0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF));
-        // [deltaP_2 <= 0, deltaP_2 <= 0, deltaP_2 > 0, deltaP_2 > 0]
-        deltaP_2_mask = _mm256_xor_pd(deltaP_2_mask, flip_mask);
-
-        __m256d deltaP_xy_12_mask = _mm256_and_pd(_mm256_and_pd(deltaP_2_mask, impulse_mask_2), _mm256_and_pd(contact_mag_mask, contact_z_mask));
-        deltaP_xy12 = _mm256_and_pd(deltaP_xy12, deltaP_xy_12_mask);
-
-        deltaP_12 = _mm256_and_pd(deltaP_12, contact_mag_mask);
-        __m256d deltaP_12_mask = _mm256_castsi256_pd(_mm256_set_epi64x(0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF, 0, 0xFFFFFFFFFFFFFFFF));
-        deltaP_12 = _mm256_and_pd(deltaP_12, _mm256_or_pd(contact_z_mask, deltaP_12_mask));
-
-        END_PROFILE(impulse);
-        START_PROFILE(delta);
-
-        FLOPS(6, 0, 4, 0, complete_function, delta);
-
-        // Velocity changes
-        __m256d deltaP_1_4 = _mm256_permute4x64_pd(deltaP_12, 0);
-        // [deltaP_1, deltaP_1, deltaP_2 deltaP_2]
-        __m256d deltaP1_deltaP_x1 = _mm256_blend_pd(deltaP4, deltaP_1_4, 0b0101);
-        __m256d delta_velocites = _mm256_fmadd_pd(_mm256_set_pd(1.0, -1.0, -1.0, 1.0), deltaP1_deltaP_x1, deltaP_xy12);
-        velocities = _mm256_add_pd(velocities, _mm256_div_pd(delta_velocites, M4));
-
-        FLOPS(6, 6, 0, 0, complete_function, delta);
-
-        // [y1, x1, y2, x2] !!! ! Y is first such that we can skip reorderring before surface calculation
-        // cant reuse previous, because it may have been set to 0 in rare cases
-        deltaP_2_4 = _mm256_permute4x64_pd(deltaP_12, 0b01010101);
-        __m256d deltaP_2_0 = _mm256_blend_pd(deltaP_2_4, _mm256_setzero_pd(), 0b0101);
-        __m256d delta_angular = _mm256_fmadd_pd(_mm256_set_pd(1.0, -1.0, 1.0, -1.0), deltaP_xy12, deltaP_2_0);
-        // __m256d delta_angular = _mm256_set_pd(deltaP_2 + deltaP_y_2, -deltaP_x_2, deltaP_2 + deltaP_y_1, -deltaP_x_1);
-        angular = _mm256_fmadd_pd(C4, delta_angular, angular);
-
-        FLOPS(6, 0, 0, 0, complete_function, delta);
-        angular_z = _mm256_fmadd_pd(NC4, deltaP_1_4, angular_z);
-
-        END_PROFILE(delta);
-        START_PROFILE(velocity);
-
-        FLOPS(4, 4, 0, 0, complete_function, velocity);
-        surface_velocities = _mm256_fmadd_pd(R_ALTERNATE_4, angular, velocities);
-
-        // Extract y-components without spilling the register to memory
-        // lanes 0-1: x1 | y1   (low 128)   lanes 2-3: x2 | y2 (high 128)
-        __m128d low128 = _mm256_castpd256_pd128(velocities);    // x1 | y1
-        __m128d high128 = _mm256_extractf128_pd(velocities, 1); // x2 | y2
-
-        double _local_velocity_y_1 = _mm_cvtsd_f64(_mm_unpackhi_pd(low128, low128));
-        double _local_velocity_y_2 = _mm_cvtsd_f64(_mm_unpackhi_pd(high128, high128));
-
-        FLOPS(3, 2, 0, 0, complete_function, velocity);
-        // Update work and check compression phase
-        double velocity_diff_y_temp = velocity_diff_y;
-        velocity_diff_y = _local_velocity_y_2 - _local_velocity_y_1;
-        total_work += 0.5 * deltaP * fabs(velocity_diff_y_temp + velocity_diff_y);
-
-        if (__builtin_expect(work_compression == 0 && velocity_diff_y > 0, false))
-        {
-            BRANCH(10);
-            work_compression = total_work;
-            FLOPS(1, 2, 0, 0, complete_function, velocity);
-            work_required = (1.0 + e_b * e_b) * work_compression;
-        }
-
-        END_PROFILE(velocity);
-    }
-
-    START_PROFILE(after_loop);
-
-    double test[4];
-    _mm256_storeu_pd(test, velocities);
-    _local_velocity_x_1 = test[0];
-    _local_velocity_y_1 = test[1];
-    _local_velocity_x_2 = test[2];
-    _local_velocity_y_2 = test[3];
-
-    double test_a[4];
-    _mm256_storeu_pd(test, angular);
-    _local_angular_velocity_y_1 = test[0];
-    _local_angular_velocity_x_1 = test[1];
-    _local_angular_velocity_y_2 = test[2];
-    _local_angular_velocity_x_2 = test[3];
-
-    MEMORY(4, complete_function, after_loop);
-    FLOPS(2, 4, 0, 0, complete_function, after_loop);
-    rvw1_result[3] = _local_velocity_x_1 * forward[1] + _local_velocity_y_1 * forward[0];
-    rvw2_result[3] = _local_velocity_x_2 * forward[1] + _local_velocity_y_2 * forward[0];
-    FLOPS(2, 4, 0, 0, complete_function, after_loop);
-    rvw1_result[6] = _local_angular_velocity_x_1 * forward[1] + _local_angular_velocity_y_1 * forward[0];
-    rvw2_result[6] = _local_angular_velocity_x_2 * forward[1] + _local_angular_velocity_y_2 * forward[0];
-
-    MEMORY(4, complete_function, after_loop);
-    FLOPS(2, 4, 0, 0, complete_function, after_loop);
-    rvw1_result[4] = _local_velocity_x_1 * forward[2] + _local_velocity_y_1 * forward[1];
-    rvw2_result[4] = _local_velocity_x_2 * forward[2] + _local_velocity_y_2 * forward[1];
-    FLOPS(2, 4, 0, 0, complete_function, after_loop);
-    rvw1_result[7] = _local_angular_velocity_x_1 * forward[2] + _local_angular_velocity_y_1 * forward[1];
-    rvw2_result[7] = _local_angular_velocity_x_2 * forward[2] + _local_angular_velocity_y_2 * forward[1];
-
-    MEMORY(4, complete_function, after_loop);
-    FLOPS(0, 2, 0, 0, complete_function, after_loop);
-    rvw1_result[5] = 0.0;
-    rvw2_result[5] = 0.0;
-
-    double test_x[4];
-    _mm256_storeu_pd(test, angular_z);
-    _local_angular_velocity_z_1 = test[2];
-    _local_angular_velocity_z_2 = test[3];
-
-    rvw1_result[8] = _local_angular_velocity_z_1;
-    rvw2_result[8] = _local_angular_velocity_z_2;
-
-    END_PROFILE(after_loop);
-    END_PROFILE(complete_function);
-    __asm volatile("# LLVM-MCA-END" ::: "memory");
-}
 DLL_EXPORT void simd_scalar_loop(double *rvw1, double *rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double *rvw1_result, double *rvw2_result, Profile *profiles, Branch *branches)
 {
     __asm volatile("# LLVM-MCA-BEGIN simd_scalar_loop" ::: "memory");
@@ -5784,6 +5468,294 @@ DLL_EXPORT void simd_scalar_loop(double *rvw1, double *rvw2, float R, float M, f
     rvw2_result[6] = tmp[0];
     rvw2_result[7] = tmp[1];
     rvw2_result[8] = tmp[2];
+
+    END_PROFILE(after_loop);
+    END_PROFILE(complete_function);
+    __asm volatile("# LLVM-MCA-END" ::: "memory");
+}
+
+DLL_EXPORT void simd_collide_ball_2(double *rvw1, double *rvw2, float R_f, float M_f, float u_s1_f, float u_s2_f, float u_b_f, float e_b_f, float deltaP_f, int N, double *rvw1_result, double *rvw2_result, Profile *profiles, Branch *branches)
+{
+    __asm volatile("# LLVM-MCA-BEGIN simd_collide_balls_2" ::: "memory");
+#ifdef PROFILE
+    Profile *complete_function = &profiles[0], *before_loop = &profiles[1],
+            *impulse = &profiles[2], *delta = &profiles[3],
+            *velocity = &profiles[4], *after_loop = &profiles[5];
+#endif
+    START_PROFILE(complete_function);
+    START_PROFILE(before_loop);
+
+    // Scalar versions of parameters
+    double R = (double)R_f;
+    double M = (double)M_f;
+    double u_s1 = (double)u_s1_f;
+    double u_s2 = (double)u_s2_f;
+    double u_b = (double)u_b_f;
+    double e_b = (double)e_b_f;
+    double deltaP = (double)deltaP_f;
+
+    // SIMD Constants
+    // R_signed_for_sv will be multiplied with langXY = [lay1_s, lay2_s, lax1_s, lax2_s]
+    // to produce terms to be added to lvel = [lvx1_s, lvx2_s, lvy1_s, lvy2_s]
+    // sv = [svx1, svx2, svy1, svy2]
+    // svx1 = lvx1 + R*lay1  => R_signed_for_sv[0] should be R (for langXY[0]=lay1)
+    // svx2 = lvx2 + R*lay2  => R_signed_for_sv[1] should be R (for langXY[1]=lay2)
+    // svy1 = lvy1 - R*lax1  => R_signed_for_sv[2] should be -R (for langXY[2]=lax1)
+    // svy2 = lvy2 - R*lax2  => R_signed_for_sv[3] should be -R (for langXY[3]=lax2)
+    // _mm256_set_pd(d,c,b,a) -> memory [a,b,c,d]
+    const __m256d R_signed_for_sv = _mm256_set_pd(-R, -R, R, R); // Memory: [R, R, -R, -R]
+
+    /* ---------------- fetch & convert inputs to v3d ---------------- */
+    v3d trans1 = V3D_LOAD(get_displacement(rvw1));
+    v3d trans2 = V3D_LOAD(get_displacement(rvw2));
+
+    v3d vel1 = V3D_LOAD(get_velocity(rvw1));
+    v3d vel2 = V3D_LOAD(get_velocity(rvw2));
+
+    v3d ang1 = V3D_LOAD(get_angular_velocity(rvw1));
+    v3d ang2 = V3D_LOAD(get_angular_velocity(rvw2));
+
+    /* --------------- axis basis ------------------------------------ */
+    v3d offset = V3D_SUB(trans2, trans1); /* p₂-p₁ */
+    v3d forward = V3D_MULS(offset, (1.0 / sqrt(v3d_dot(offset, offset))));
+    const v3d up = V3D_SET(0.0, 0.0, 1.0);
+    v3d right = v3d_cross(forward, up);
+
+    /* --------------- local velocities (scalar for setup) ----------- */
+    double lvx1_s = v3d_dot(vel1, right);
+    double lvy1_s = v3d_dot(vel1, forward);
+    double lvx2_s = v3d_dot(vel2, right);
+    double lvy2_s = v3d_dot(vel2, forward);
+
+    double lax1_s = v3d_dot(ang1, right);
+    double lay1_s = v3d_dot(ang1, forward);
+    double laz1_s = v3d_dot(ang1, up);
+
+    double lax2_s = v3d_dot(ang2, right);
+    double lay2_s = v3d_dot(ang2, forward);
+    double laz2_s = v3d_dot(ang2, up);
+    
+    /* --------------- Pack into SIMD registers ---------------------- */
+    // Order for _mm256_set_pd(d, c, b, a): memory = [a, b, c, d]
+    // lvel stores [lvx1_s, lvx2_s, lvy1_s, lvy2_s] for direct use in sv calculation
+    __m256d lvel = _mm256_set_pd(lvy2_s, lvy1_s, lvx2_s, lvx1_s);
+    // langXY stores [lay1_s, lay2_s, lax1_s, lax2_s] for direct use in sv calculation
+    __m256d langXY = _mm256_set_pd(lax2_s, lax1_s, lay2_s, lay1_s); 
+    // langZ stores [laz1_s, laz2_s]
+    __m128d langZ = _mm_set_pd(laz2_s, laz1_s);
+
+    /* --------------- SIMD Constants from parameters ---------------- */
+    const double invM_s = 1.0 / M;
+    const double C_s = 5.0 / (2.0 * M * R);
+    const __m256d invM4 = _mm256_set1_pd(invM_s);
+    const __m256d C4 = _mm256_set1_pd(C_s);
+
+    /* --------------- Surface velocities (sv) SIMD calculation ------ */
+    // sv = lvel + R_signed_for_sv * langXY
+    // sv will store [svx1_s, svx2_s, svy1_s, svy2_s]
+    __m256d sv = _mm256_fmadd_pd(R_signed_for_sv, langXY, lvel);
+
+    /* --------------- Pre-loop calculations using initial scalars ----- */
+    double cpx = lvx1_s - lvx2_s - R * (laz1_s + laz2_s);
+    double cpz = R * (lax1_s + lax2_s);
+    double cp_len = sqrt(cpx * cpx + cpz * cpz);
+
+    double vdiff = lvy2_s - lvy1_s; // Used for loop condition
+
+    if (deltaP == 0.0f) 
+        deltaP = 0.5 * (1.0 + e_b) * M * fabs(vdiff) / N;
+
+    double total_work = 0.0, work_required = INFINITY, work_compr = 0.0;
+
+    // Scalar impulse components, calculated fresh each iteration
+    double dP1_s, dP2_s;
+    double dPx1_s, dPy1_s, dPx2_s, dPy2_s;
+
+    // Arrays for storing SIMD vector contents to extract scalars
+    double lvel_arr[4];
+    double langXY_arr[4];
+    double langZ_arr[2];
+    double sv_arr[4];
+
+    END_PROFILE(before_loop);
+
+    /* ----------------------------- main loop ----------------------- */
+    while (vdiff < 0.0 || total_work < work_required)
+    {
+        // Update scalar views from SIMD registers at start of loop for conditional logic
+        _mm256_storeu_pd(lvel_arr, lvel); // lvel_arr is [lvx1_s, lvx2_s, lvy1_s, lvy2_s]
+        lvx1_s = lvel_arr[0]; lvx2_s = lvel_arr[1]; lvy1_s = lvel_arr[2]; lvy2_s = lvel_arr[3];
+
+        _mm256_storeu_pd(langXY_arr, langXY); // langXY_arr is [lay1_s, lay2_s, lax1_s, lax2_s]
+        lay1_s = langXY_arr[0]; lay2_s = langXY_arr[1]; lax1_s = langXY_arr[2]; lax2_s = langXY_arr[3];
+        
+        _mm_storeu_pd(langZ_arr, langZ); // langZ_arr is [laz1_s, laz2_s]
+        laz1_s = langZ_arr[0]; laz2_s = langZ_arr[1];
+
+        // Recompute surface velocities (sv) and their lengths (scalar for conditions)
+        // sv stores [svx1_s, svx2_s, svy1_s, svy2_s]
+        _mm256_storeu_pd(sv_arr, sv); 
+        double svx1_s_loop = sv_arr[0]; double svx2_s_loop = sv_arr[1]; 
+        double svy1_s_loop = sv_arr[2]; double svy2_s_loop = sv_arr[3];
+
+        double svlen1_s = sqrt(svx1_s_loop * svx1_s_loop + svy1_s_loop * svy1_s_loop);
+        double svlen2_s = sqrt(svx2_s_loop * svx2_s_loop + svy2_s_loop * svy2_s_loop);
+
+        // Recompute contact point info (scalar for conditions)
+        cpx = lvx1_s - lvx2_s - R * (laz1_s + laz2_s);
+        cpz = R * (lax1_s + lax2_s);
+        cp_len = sqrt(cpx * cpx + cpz * cpz);
+
+        START_PROFILE(impulse);
+
+        if (cp_len < 1e-16)
+        {
+            dP1_s = dP2_s = dPx1_s = dPy1_s = dPx2_s = dPy2_s = 0.0;
+        }
+        else
+        {
+            dP1_s = -u_b * deltaP * cpx / cp_len;
+
+            if (fabs(cpz) < 1e-16)
+            {
+                dP2_s = dPx1_s = dPy1_s = dPx2_s = dPy2_s = 0.0;
+            }
+            else
+            {
+                dP2_s = -u_b * deltaP * cpz / cp_len;
+                if (dP2_s > 0.0)
+                {
+                    dPx1_s = dPy1_s = 0.0;
+                    if (svlen2_s == 0.0)
+                    {
+                        dPx2_s = dPy2_s = 0.0;
+                    }
+                    else
+                    {
+                        double inv_svlen2 = 1.0 / svlen2_s;
+                        dPx2_s = -u_s2 * svx2_s_loop * inv_svlen2 * dP2_s;
+                        dPy2_s = -u_s2 * svy2_s_loop * inv_svlen2 * dP2_s;
+                    }
+                }
+                else
+                {
+                    dPx2_s = dPy2_s = 0.0;
+                    if (svlen1_s == 0.0) 
+                    {
+                        dPx1_s = dPy1_s = 0.0;
+                    }
+                    else
+                    {
+                        double inv_svlen1 = 1.0 / svlen1_s;
+                        dPx1_s = u_s1 * svx1_s_loop * inv_svlen1 * dP2_s;
+                        dPy1_s = u_s1 * svy1_s_loop * inv_svlen1 * dP2_s;
+                    }
+                }
+            }
+        }
+        END_PROFILE(impulse);
+        START_PROFILE(delta);
+
+        // Create SIMD vectors for deltas based on scalar impulse components
+        // lvel memory layout: [lvx1_s, lvx2_s, lvy1_s, lvy2_s]
+        // delta_lvel must match this to update correctly.
+        // Order for _mm256_set_pd(d, c, b, a) -> memory [a,b,c,d]
+        __m256d delta_lvel = _mm256_set_pd(
+            (deltaP + dPy2_s),      // for lvy2_s (lvel[3])
+            (-deltaP + dPy1_s),     // for lvy1_s (lvel[2])
+            (-dP1_s + dPx2_s),      // for lvx2_s (lvel[1])
+            (dP1_s + dPx1_s)        // for lvx1_s (lvel[0])
+        );
+        lvel = _mm256_fmadd_pd(delta_lvel, invM4, lvel);
+
+        // langXY memory layout: [lay1_s, lay2_s, lax1_s, lax2_s]
+        // delta_langXY must match this.
+        __m256d delta_langXY = _mm256_set_pd(
+            (dP2_s + dPy2_s),       // for lax2_s (langXY[3])
+            (dP2_s + dPy1_s),       // for lax1_s (langXY[2])
+            (-dPx2_s),              // for lay2_s (langXY[1])
+            (-dPx1_s)               // for lay1_s (langXY[0])
+        );
+        langXY = _mm256_fmadd_pd(delta_langXY, C4, langXY);
+        
+        // langZ memory layout: [laz1_s, laz2_s]
+        // delta_langZ must match this.
+        __m128d delta_langZ = _mm_set_pd(
+            (-dP1_s),               // for laz2_s (langZ[1])
+            (-dP1_s)                // for laz1_s (langZ[0])
+        );
+        langZ = _mm_fmadd_pd(delta_langZ, _mm256_castpd256_pd128(C4), langZ);
+
+        END_PROFILE(delta);
+        START_PROFILE(velocity);
+
+        /* recompute SIMD sv for next iteration's potential use */
+        // sv = lvel + R_signed_for_sv * langXY
+        // sv will store [svx1_s, svx2_s, svy1_s, svy2_s]
+        sv = _mm256_fmadd_pd(R_signed_for_sv, langXY, lvel);
+        
+        // Update scalar vdiff for loop condition
+        _mm256_storeu_pd(lvel_arr, lvel); // lvel_arr is [lvx1_s, lvx2_s, lvy1_s, lvy2_s]
+        lvy1_s = lvel_arr[2]; lvy2_s = lvel_arr[3];
+
+        double vdiff_prev = vdiff;
+        vdiff = lvy2_s - lvy1_s; 
+        total_work += 0.5 * deltaP * fabs(vdiff_prev + vdiff);
+
+        if (work_compr == 0.0 && vdiff > 0.0)
+        {
+            work_compr = total_work;
+            work_required = (1.0 + e_b * e_b) * work_compr;
+        }
+        END_PROFILE(velocity);
+    }
+
+    /* ---------------------- write back results ---------------------- */
+    START_PROFILE(after_loop);
+
+    // Final scalar values from SIMD registers
+    _mm256_storeu_pd(lvel_arr, lvel); // lvel_arr is [lvx1_s, lvx2_s, lvy1_s, lvy2_s]
+    lvx1_s = lvel_arr[0]; lvx2_s = lvel_arr[1]; lvy1_s = lvel_arr[2]; lvy2_s = lvel_arr[3];
+
+    _mm256_storeu_pd(langXY_arr, langXY); // langXY_arr is [lay1_s, lay2_s, lax1_s, lax2_s]
+    lay1_s = langXY_arr[0]; lay2_s = langXY_arr[1]; lax1_s = langXY_arr[2]; lax2_s = langXY_arr[3];
+    
+    _mm_storeu_pd(langZ_arr, langZ); // langZ_arr is [laz1_s, laz2_s]
+    laz1_s = langZ_arr[0]; laz2_s = langZ_arr[1];
+
+    /* broadcast the final local scalars once for world transformation */
+    __m256d bx1 = _mm256_set1_pd(lvx1_s);
+    __m256d by1 = _mm256_set1_pd(lvy1_s);
+    __m256d bx2 = _mm256_set1_pd(lvx2_s);
+    __m256d by2 = _mm256_set1_pd(lvy2_s);
+
+    __m256d bax1 = _mm256_set1_pd(lax1_s);
+    __m256d bay1 = _mm256_set1_pd(lay1_s);
+    __m256d baz1 = _mm256_set1_pd(laz1_s);
+
+    __m256d bax2 = _mm256_set1_pd(lax2_s);
+    __m256d bay2 = _mm256_set1_pd(lay2_s);
+    __m256d baz2 = _mm256_set1_pd(laz2_s);
+
+    const __m256d up_v = V3D_SET(0.0, 0.0, 1.0);
+
+    /* world linear velocity = right*lx + forward*ly */
+    __m256d wvel1 = _mm256_fmadd_pd(right, bx1, _mm256_mul_pd(forward, by1));
+    __m256d wvel2 = _mm256_fmadd_pd(right, bx2, _mm256_mul_pd(forward, by2));
+
+    /* world angular velocity = right*lax + forward*lay + up*laz            */
+    __m256d wang1 = _mm256_fmadd_pd(
+        up_v, baz1,
+        _mm256_fmadd_pd(forward, bay1, _mm256_mul_pd(right, bax1)));
+
+    __m256d wang2 = _mm256_fmadd_pd(
+        up_v, baz2,
+        _mm256_fmadd_pd(forward, bay2, _mm256_mul_pd(right, bax2)));
+
+    V3D_STORE(&rvw1_result[3], wvel1);
+    V3D_STORE(&rvw2_result[3], wvel2);
+    V3D_STORE(&rvw1_result[6], wang1);
+    V3D_STORE(&rvw2_result[6], wang2);
 
     END_PROFILE(after_loop);
     END_PROFILE(complete_function);
