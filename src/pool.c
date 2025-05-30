@@ -118,7 +118,7 @@ DLL_EXPORT void hello_world(const char *matrix_name, double *rvw)
     printf("Received %s\n", matrix_name);
     for (int i = 0; i < 9; i++)
     {
-        printf("%f ", rvw[i]);
+        printf("%.17g ", rvw[i]);
         if ((i + 1) % 3 == 0)
             printf("\n");
     }
@@ -264,7 +264,7 @@ DLL_EXPORT void collide_balls(double *rvw1, double *rvw2, float R, float M, floa
     double contact_point_velocity_z = R * (local_angular_velocity_x_1 + local_angular_velocity_x_2);
     double ball_ball_contact_point_magnitude = sqrt(contact_point_velocity_x * contact_point_velocity_x + contact_point_velocity_z * contact_point_velocity_z);
     // printf("\nC Contact Point Slide, Spin:\n");
-    // printf("  Contact Point: u_ijC_xz_mag= %.6f\n", ball_ball_contact_point_magnitude);
+    // printf("  Contact Point: u_ijC_xz_mag= %.17g\n", ball_ball_contact_point_magnitude);
 
     // Main collision loop
     FLOPS(1, 0, 0, 0, complete_function, before_loop);
@@ -380,7 +380,7 @@ DLL_EXPORT void collide_balls(double *rvw1, double *rvw2, float R, float M, floa
             }
         }
 
-        // printf("0 %f %lf %lf %lf %lf %lf %lf\n", deltaP, deltaP_1, deltaP_2, deltaP_x_1, deltaP_y_1, deltaP_x_2, deltaP_y_2);
+        // printf("0 %.17g %lf %lf %lf %lf %lf %lf\n", deltaP, deltaP_1, deltaP_2, deltaP_x_1, deltaP_y_1, deltaP_x_2, deltaP_y_2);
 
         END_PROFILE(impulse);
         START_PROFILE(delta);
@@ -483,7 +483,7 @@ DLL_EXPORT void collide_balls(double *rvw1, double *rvw2, float R, float M, floa
     __asm volatile("# LLVM-MCA-END" ::: "memory");
 }
 
-DLL_EXPORT void scalar_improvements(double *rvw1, double *rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double *rvw1_result, double *rvw2_result, Profile *profiles, Branch *branches)
+DLL_EXPORT void scalar_improvements(double *restrict rvw1, double *restrict rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double *restrict rvw1_result, double *restrict rvw2_result, Profile *profiles, Branch *branches)
 {
     __asm volatile("# LLVM-MCA-BEGIN collide_balls_scalar_improvement" ::: "memory");
 #ifdef PROFILE
@@ -723,7 +723,7 @@ DLL_EXPORT void scalar_improvements(double *rvw1, double *rvw2, float R, float M
     __asm volatile("# LLVM-MCA-END" ::: "memory");
 }
 
-DLL_EXPORT void scalar_less_sqrt(double *rvw1, double *rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double *rvw1_result, double *rvw2_result, Profile *profiles, Branch *branches)
+DLL_EXPORT void scalar_less_sqrt(double *restrict rvw1, double *restrict rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double *restrict rvw1_result, double *restrict rvw2_result, Profile *profiles, Branch *branches)
 {
     __asm volatile("# LLVM-MCA-BEGIN collide_balls_scalar_less_sqrt" ::: "memory");
 #ifdef PROFILE
@@ -970,7 +970,7 @@ DLL_EXPORT void scalar_less_sqrt(double *rvw1, double *rvw2, float R, float M, f
     __asm volatile("# LLVM-MCA-END" ::: "memory");
 }
 
-DLL_EXPORT void approxsq_collide_balls(double *rvw1, double *rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double *rvw1_result, double *rvw2_result, Profile *profiles, Branch *branches)
+DLL_EXPORT void approxsq_collide_balls(double *restrict rvw1, double *restrict rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double *restrict rvw1_result, double *restrict rvw2_result, Profile *profiles, Branch *branches)
 {
     __asm volatile("# LLVM-MCA-BEGIN collide_balls_approxsq" ::: "memory");
 #ifdef PROFILE
@@ -1237,7 +1237,7 @@ double fast_inv_sqrt(double x, double z, int iterations) {
 }
 */
 
-DLL_EXPORT void recip_sqrt(double *rvw1, double *rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double *rvw1_result, double *rvw2_result, Profile *profiles, Branch *branches)
+DLL_EXPORT void recip_sqrt(double *restrict rvw1, double *restrict rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double *restrict rvw1_result, double *restrict rvw2_result, Profile *profiles, Branch *branches)
 {
     __asm volatile("# LLVM-MCA-BEGIN collide_balls_recip_sqrt" ::: "memory");
 #ifdef PROFILE
@@ -1492,7 +1492,7 @@ DLL_EXPORT void recip_sqrt(double *rvw1, double *rvw2, float R, float M, float u
     __asm volatile("# LLVM-MCA-END" ::: "memory");
 }
 
-DLL_EXPORT void recip_sqrt_less_if(double *rvw1, double *rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double *rvw1_result, double *rvw2_result, Profile *profiles, Branch *branches)
+DLL_EXPORT void recip_sqrt_less_if(double *restrict rvw1, double *restrict rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double *restrict rvw1_result, double *restrict rvw2_result, Profile *profiles, Branch *branches)
 {
     __asm volatile("# LLVM-MCA-BEGIN collide_balls_recip_sqrt_less_if" ::: "memory");
 #ifdef PROFILE
@@ -1731,7 +1731,7 @@ DLL_EXPORT void recip_sqrt_less_if(double *rvw1, double *rvw2, float R, float M,
     __asm volatile("# LLVM-MCA-END" ::: "memory");
 }
 
-DLL_EXPORT void recip_sqrt_better_ifs(double *rvw1, double *rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double *rvw1_result, double *rvw2_result, Profile *profiles, Branch *branches)
+DLL_EXPORT void recip_sqrt_better_ifs(double *restrict rvw1, double *restrict rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double *restrict rvw1_result, double *restrict rvw2_result, Profile *profiles, Branch *branches)
 {
     __asm volatile("# LLVM-MCA-BEGIN collide_balls_recip_sqrt_better_ifs" ::: "memory");
 #ifdef PROFILE
@@ -2016,7 +2016,7 @@ DLL_EXPORT void recip_sqrt_better_ifs(double *rvw1, double *rvw2, float R, float
     __asm volatile("# LLVM-MCA-END" ::: "memory");
 }
 
-DLL_EXPORT void recip_sqrt_with_if_changed(double *rvw1, double *rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double *rvw1_result, double *rvw2_result, Profile *profiles, Branch *branches)
+DLL_EXPORT void recip_sqrt_with_if_changed(double *restrict rvw1, double *restrict rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double *restrict rvw1_result, double *restrict rvw2_result, Profile *profiles, Branch *branches)
 {
     __asm volatile("# LLVM-MCA-BEGIN collide_balls_recip_sqrt_with_if_changed" ::: "memory");
 #ifdef PROFILE
@@ -2287,7 +2287,7 @@ DLL_EXPORT void recip_sqrt_with_if_changed(double *rvw1, double *rvw2, float R, 
     __asm volatile("# LLVM-MCA-END" ::: "memory");
 }
 
-DLL_EXPORT void simple_precompute_cb(double *rvw1, double *rvw2, float Rf, float Mf, float u_s1f, float u_s2f, float u_bf, float e_bf, float deltaPf, int N, double *rvw1_result, double *rvw2_result, Profile *profiles, Branch *branches)
+DLL_EXPORT void simple_precompute_cb(double *restrict rvw1, double *restrict rvw2, float Rf, float Mf, float u_s1f, float u_s2f, float u_bf, float e_bf, float deltaPf, int N, double *restrict rvw1_result, double *restrict rvw2_result, Profile *profiles, Branch *branches)
 {
     __asm volatile("# LLVM-MCA-BEGIN collide_balls_simple_precompute_cb" ::: "memory");
 #ifdef PROFILE
@@ -2386,7 +2386,7 @@ DLL_EXPORT void simple_precompute_cb(double *rvw1, double *rvw2, float Rf, float
     double contact_point_velocity_z = R * (local_angular_velocity_x_1 + local_angular_velocity_x_2);
     double ball_ball_contact_point_magnitude = sqrt(contact_point_velocity_x * contact_point_velocity_x + contact_point_velocity_z * contact_point_velocity_z);
     // printf("\nC Contact Point Slide, Spin:\n");
-    // printf("  Contact Point: u_ijC_xz_mag= %.6f\n", ball_ball_contact_point_magnitude);
+    // printf("  Contact Point: u_ijC_xz_mag= %.17g\n", ball_ball_contact_point_magnitude);
 
     // Main collision loop
     FLOPS(1, 0, 0, 0, complete_function, before_loop);
@@ -2599,7 +2599,7 @@ DLL_EXPORT void simple_precompute_cb(double *rvw1, double *rvw2, float Rf, float
     __asm volatile("# LLVM-MCA-END" ::: "memory");
 }
 
-DLL_EXPORT void less_sqrt_collide_balls(double *rvw1, double *rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double *rvw1_result, double *rvw2_result, Profile *profiles, Branch *branches)
+DLL_EXPORT void less_sqrt_collide_balls(double *restrict rvw1, double *restrict rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double *restrict rvw1_result, double *restrict rvw2_result, Profile *profiles, Branch *branches)
 {
 
     __asm volatile("# LLVM-MCA-BEGIN collide_balls_less_sqrt" ::: "memory");
@@ -2687,7 +2687,7 @@ DLL_EXPORT void less_sqrt_collide_balls(double *rvw1, double *rvw2, float R, flo
     double contact_point_velocity_z = R * (local_angular_velocity_x_1 + local_angular_velocity_x_2);
     double ball_ball_contact_point_magnitude = sqrt(contact_point_velocity_x * contact_point_velocity_x + contact_point_velocity_z * contact_point_velocity_z);
     // printf("\nC Contact Point Slide, Spin:\n");
-    // printf("  Contact Point: u_ijC_xz_mag= %.6f\n", ball_ball_contact_point_magnitude);
+    // printf("  Contact Point: u_ijC_xz_mag= %.17g\n", ball_ball_contact_point_magnitude);
 
     // Main collision loop
     FLOPS(1, 0, 0, 0, complete_function, before_loop);
@@ -2902,7 +2902,7 @@ DLL_EXPORT void less_sqrt_collide_balls(double *rvw1, double *rvw2, float R, flo
     __asm volatile("# LLVM-MCA-END" ::: "memory");
 }
 
-DLL_EXPORT void less_sqrt_collide_balls2(double *rvw1, double *rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double *rvw1_result, double *rvw2_result, Profile *profiles, Branch *branches)
+DLL_EXPORT void less_sqrt_collide_balls2(double *restrict rvw1, double *restrict rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double *restrict rvw1_result, double *restrict rvw2_result, Profile *profiles, Branch *branches)
 {
 
     __asm volatile("# LLVM-MCA-BEGIN collide_balls_less_sqrt2" ::: "memory");
@@ -2992,7 +2992,7 @@ DLL_EXPORT void less_sqrt_collide_balls2(double *rvw1, double *rvw2, float R, fl
     double contact_point_velocity_z = R * (local_angular_velocity_x_1 + local_angular_velocity_x_2);
     double ball_ball_contact_point_magnitude = sqrt(contact_point_velocity_x * contact_point_velocity_x + contact_point_velocity_z * contact_point_velocity_z);
     // printf("\nC Contact Point Slide, Spin:\n");
-    // printf("  Contact Point: u_ijC_xz_mag= %.6f\n", ball_ball_contact_point_magnitude);
+    // printf("  Contact Point: u_ijC_xz_mag= %.17g\n", ball_ball_contact_point_magnitude);
 
     // Main collision loop
     FLOPS(1, 0, 0, 0, complete_function, before_loop);
@@ -3209,7 +3209,7 @@ DLL_EXPORT void less_sqrt_collide_balls2(double *rvw1, double *rvw2, float R, fl
     __asm volatile("# LLVM-MCA-END" ::: "memory");
 }
 
-DLL_EXPORT void branch_prediction_collide_balls(double *rvw1, double *rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double *rvw1_result, double *rvw2_result, Profile *profiles, Branch *branches)
+DLL_EXPORT void branch_prediction_collide_balls(double *restrict rvw1, double *restrict rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double *restrict rvw1_result, double *restrict rvw2_result, Profile *profiles, Branch *branches)
 {
     __asm volatile("# LLVM-MCA-BEGIN collide_balls_branch_prediction" ::: "memory");
 #ifdef PROFILE
@@ -3296,7 +3296,7 @@ DLL_EXPORT void branch_prediction_collide_balls(double *rvw1, double *rvw2, floa
     double contact_point_velocity_z = R * (local_angular_velocity_x_1 + local_angular_velocity_x_2);
     double ball_ball_contact_point_magnitude = sqrt(contact_point_velocity_x * contact_point_velocity_x + contact_point_velocity_z * contact_point_velocity_z);
     // printf("\nC Contact Point Slide, Spin:\n");
-    // printf("  Contact Point: u_ijC_xz_mag= %.6f\n", ball_ball_contact_point_magnitude);
+    // printf("  Contact Point: u_ijC_xz_mag= %.17g\n", ball_ball_contact_point_magnitude);
 
     // Main collision loop
     FLOPS(1, 0, 0, 0, complete_function, before_loop);
@@ -3510,7 +3510,7 @@ DLL_EXPORT void branch_prediction_collide_balls(double *rvw1, double *rvw2, floa
     __asm volatile("# LLVM-MCA-END" ::: "memory");
 }
 
-DLL_EXPORT void remove_unused_branches(double *rvw1, double *rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double *rvw1_result, double *rvw2_result, Profile *profiles, Branch *branches)
+DLL_EXPORT void remove_unused_branches(double *restrict rvw1, double *restrict rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double *restrict rvw1_result, double *restrict rvw2_result, Profile *profiles, Branch *branches)
 {
     __asm volatile("# LLVM-MCA-BEGIN collide_balls_remove_unused_branches" ::: "memory");
 #ifdef PROFILE
@@ -3597,7 +3597,7 @@ DLL_EXPORT void remove_unused_branches(double *rvw1, double *rvw2, float R, floa
     double contact_point_velocity_z = R * (local_angular_velocity_x_1 + local_angular_velocity_x_2);
     double ball_ball_contact_point_magnitude = sqrt(contact_point_velocity_x * contact_point_velocity_x + contact_point_velocity_z * contact_point_velocity_z);
     // printf("\nC Contact Point Slide, Spin:\n");
-    // printf("  Contact Point: u_ijC_xz_mag= %.6f\n", ball_ball_contact_point_magnitude);
+    // printf("  Contact Point: u_ijC_xz_mag= %.17g\n", ball_ball_contact_point_magnitude);
 
     // Main collision loop
     FLOPS(1, 0, 0, 0, complete_function, before_loop);
@@ -3784,7 +3784,7 @@ DLL_EXPORT void remove_unused_branches(double *rvw1, double *rvw2, float R, floa
     __asm volatile("# LLVM-MCA-END" ::: "memory");
 }
 
-DLL_EXPORT void code_motion_collide_balls(double *rvw1, double *rvw2, float Rf, float Mf, float u_s1f, float u_s2f, float u_bf, float e_bf, float deltaPf, int N, double *rvw1_result, double *rvw2_result, Profile *profiles, Branch *branches)
+DLL_EXPORT void code_motion_collide_balls(double *restrict rvw1, double *restrict rvw2, float Rf, float Mf, float u_s1f, float u_s2f, float u_bf, float e_bf, float deltaPf, int N, double *restrict rvw1_result, double *restrict rvw2_result, Profile *profiles, Branch *branches)
 {
     __asm volatile("# LLVM-MCA-BEGIN collide_balls_code_motion" ::: "memory");
 #ifdef PROFILE
@@ -3945,7 +3945,7 @@ DLL_EXPORT void code_motion_collide_balls(double *rvw1, double *rvw2, float Rf, 
         BRANCH(0);
 
         FLOPS(0, 3, 1, 1, complete_function, impulse);
-        // TODO: Could be optimized by using reciprocal sqrt, but intrinsics only support floats
+        // TODO: Could be optimized by using reciprocal sqrt, but intriics only support floats
         ball_ball_contact_mag = sqrt(ball_ball_contact_mag_sqrd);
         delta_ball_precomp = u_b * deltaP / ball_ball_contact_mag;
         deltaP_ball[0] = delta_ball_precomp * contact_vel[0];
@@ -4110,7 +4110,7 @@ DLL_EXPORT void code_motion_collide_balls(double *rvw1, double *rvw2, float Rf, 
     __asm volatile("# LLVM-MCA-END" ::: "memory");
 }
 
-DLL_EXPORT void code_motion_register_relieve(double *rvw1, double *rvw2, float Rf, float Mf, float u_s1f, float u_s2f, float u_bf, float e_bf, float deltaPf, int N, double *rvw1_result, double *rvw2_result, Profile *profiles, Branch *branches)
+DLL_EXPORT void code_motion_register_relieve(double *restrict rvw1, double *restrict rvw2, float Rf, float Mf, float u_s1f, float u_s2f, float u_bf, float e_bf, float deltaPf, int N, double *restrict rvw1_result, double *restrict rvw2_result, Profile *profiles, Branch *branches)
 {
     __asm volatile("# LLVM-MCA-BEGIN collide_balls_code_motion_register_relieve" ::: "memory");
 #ifdef PROFILE
@@ -4384,7 +4384,7 @@ DLL_EXPORT void code_motion_register_relieve(double *rvw1, double *rvw2, float R
     __asm volatile("# LLVM-MCA-END" ::: "memory");
 }
 
-DLL_EXPORT void code_motion_collide_balls2(double *rvw1, double *rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double *rvw1_result, double *rvw2_result, Profile *profiles, Branch *branches)
+DLL_EXPORT void code_motion_collide_balls2(double *restrict rvw1, double *restrict rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double *restrict rvw1_result, double *restrict rvw2_result, Profile *profiles, Branch *branches)
 {
     __asm volatile("# LLVM-MCA-BEGIN collide_balls_code_motion_collide_balls2" ::: "memory");
 #ifdef PROFILE
@@ -4472,7 +4472,7 @@ DLL_EXPORT void code_motion_collide_balls2(double *rvw1, double *rvw2, float R, 
     double contact_point_velocity_z = R * (local_angular_velocity_x_1 + local_angular_velocity_x_2);
     double ball_ball_contact_point_magnitude = sqrt(contact_point_velocity_x * contact_point_velocity_x + contact_point_velocity_z * contact_point_velocity_z);
     // printf("\nC Contact Point Slide, Spin:\n");
-    // printf("  Contact Point: u_ijC_xz_mag= %.6f\n", ball_ball_contact_point_magnitude);
+    // printf("  Contact Point: u_ijC_xz_mag= %.17g\n", ball_ball_contact_point_magnitude);
 
     // Main collision loop
     FLOPS(1, 0, 0, 0, complete_function, before_loop);
@@ -4689,8 +4689,8 @@ DLL_EXPORT void code_motion_collide_balls2(double *rvw1, double *rvw2, float R, 
     __asm volatile("# LLVM-MCA-END" ::: "memory");
 }
 
-// https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html
-DLL_EXPORT void simd_collide_balls(double *rvw1, double *rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double *rvw1_result, double *rvw2_result, Profile *profiles, Branch *branches)
+// https://www.intel.com/content/www/us/en/docs/intriics-guide/index.html
+DLL_EXPORT void simd_collide_balls(double *restrict rvw1, double *restrict rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double *restrict rvw1_result, double *restrict rvw2_result, Profile *profiles, Branch *branches)
 {
     __asm volatile("# LLVM-MCA-BEGIN collide_balls_simd_collide_balls" ::: "memory");
 #ifdef PROFILE
@@ -4765,7 +4765,7 @@ DLL_EXPORT void simd_collide_balls(double *rvw1, double *rvw2, float R, float M,
     // [0, 0, wz1, wz2]
     __m256d angular_z = _mm256_set_pd(_local_angular_velocity_z_2, _local_angular_velocity_z_1, 0, 0);
 
-    __m256d R_ALTERNATE_4 = _mm256_set_pd((double)(-R), (double)R, (double)(-R), R); // TODO: could use fm_addsub instead of this?
+    __m256d R_ALTERNATE_4 = _mm256_set_pd((double)(-R), (double)R, (double)(-R), R); // TODO: could use fm_addsub itead of this?
     __m256d R4 = _mm256_set1_pd((double)R);
     __m256d M4 = _mm256_set1_pd((double)M);
     // [x1, y1, x2, y2]
@@ -4774,7 +4774,7 @@ DLL_EXPORT void simd_collide_balls(double *rvw1, double *rvw2, float R, float M,
     FLOPS(5, 4, 0, 1, complete_function, before_loop);
 
     // printf("\nC Contact Point Slide, Spin:\n");
-    // printf("  Contact Point: u_ijC_xz_mag= %.6f\n", ball_ball_contact_point_magnitude);
+    // printf("  Contact Point: u_ijC_xz_mag= %.17g\n", ball_ball_contact_point_magnitude);
 
     // deltaP is most likely always 0?
     // ΔP represents the Impulse during a time of Δt
@@ -5001,7 +5001,7 @@ DLL_EXPORT void simd_collide_balls(double *rvw1, double *rvw2, float R, float M,
     __asm volatile("# LLVM-MCA-END" ::: "memory");
 }
 
-DLL_EXPORT void improved_symmetry_collide_balls(double *rvw1, double *rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double *rvw1_result, double *rvw2_result, Profile *profiles, Branch *branches)
+DLL_EXPORT void improved_symmetry_collide_balls(double *restrict rvw1, double *restrict rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double *restrict rvw1_result, double *restrict rvw2_result, Profile *profiles, Branch *branches)
 {
     __asm volatile("# LLVM-MCA-BEGIN improved_symmetry_collide_balls" ::: "memory");
 // Keep the original structure but optimize within it
@@ -5250,8 +5250,8 @@ DLL_EXPORT void improved_symmetry_collide_balls(double *rvw1, double *rvw2, floa
     __asm volatile("# LLVM-MCA-END" ::: "memory");
 }
 
-// https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html
-DLL_EXPORT void simd_collide_ball_2(double *rvw1, double *rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double *rvw1_result, double *rvw2_result, Profile *profiles, Branch *branches)
+// https://www.intel.com/content/www/us/en/docs/intriics-guide/index.html
+DLL_EXPORT void simd_collide_ball_2(double *restrict rvw1, double *restrict rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double *restrict rvw1_result, double *restrict rvw2_result, Profile *profiles, Branch *branches)
 {
     __asm volatile("# LLVM-MCA-BEGIN simd_collide_ball_2" ::: "memory");
 #ifdef PROFILE
@@ -5326,7 +5326,7 @@ DLL_EXPORT void simd_collide_ball_2(double *rvw1, double *rvw2, float R, float M
     // [0, 0, wz1, wz2]
     __m256d angular_z = _mm256_set_pd(_local_angular_velocity_z_2, _local_angular_velocity_z_1, 0, 0);
 
-    __m256d R_ALTERNATE_4 = _mm256_set_pd((double)(-R), (double)R, (double)(-R), R); // TODO: could use fm_addsub instead of this?
+    __m256d R_ALTERNATE_4 = _mm256_set_pd((double)(-R), (double)R, (double)(-R), R); // TODO: could use fm_addsub itead of this?
     __m256d R4 = _mm256_set1_pd((double)R);
     __m256d M4 = _mm256_set1_pd((double)M);
     // [x1, y1, x2, y2]
@@ -5335,7 +5335,7 @@ DLL_EXPORT void simd_collide_ball_2(double *rvw1, double *rvw2, float R, float M
     FLOPS(5, 4, 0, 1, complete_function, before_loop);
 
     // printf("\nC Contact Point Slide, Spin:\n");
-    // printf("  Contact Point: u_ijC_xz_mag= %.6f\n", ball_ball_contact_point_magnitude);
+    // printf("  Contact Point: u_ijC_xz_mag= %.17g\n", ball_ball_contact_point_magnitude);
 
     // deltaP is most likely always 0?
     // ΔP represents the Impulse during a time of Δt
@@ -5566,7 +5566,7 @@ DLL_EXPORT void simd_collide_ball_2(double *rvw1, double *rvw2, float R, float M
     END_PROFILE(complete_function);
     __asm volatile("# LLVM-MCA-END" ::: "memory");
 }
-DLL_EXPORT void simd_scalar_loop(double *rvw1, double *rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double *rvw1_result, double *rvw2_result, Profile *profiles, Branch *branches)
+DLL_EXPORT void simd_scalar_loop(double *restrict rvw1, double *restrict rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double *restrict rvw1_result, double *restrict rvw2_result, Profile *profiles, Branch *branches)
 {
     __asm volatile("# LLVM-MCA-BEGIN simd_scalar_loop" ::: "memory");
 #ifdef PROFILE
@@ -5626,7 +5626,7 @@ DLL_EXPORT void simd_scalar_loop(double *rvw1, double *rvw2, float R, float M, f
 
     double vdiff = lvy2 - lvy1;
 
-    if (deltaP == 0.0f)
+    if (deltaP == 0.0)
         deltaP = 0.5 * (1.0 + e_b) * M * fabs(vdiff) / N;
 
     double total_work = 0.0, work_required = INFINITY, work_compr = 0.0;
@@ -5781,6 +5781,343 @@ DLL_EXPORT void simd_scalar_loop(double *rvw1, double *rvw2, float R, float M, f
     rvw1_result[8] = tmp[2];
 
     _mm256_storeu_pd(tmp, wang2);
+    rvw2_result[6] = tmp[0];
+    rvw2_result[7] = tmp[1];
+    rvw2_result[8] = tmp[2];
+
+    END_PROFILE(after_loop);
+    END_PROFILE(complete_function);
+    __asm volatile("# LLVM-MCA-END" ::: "memory");
+}
+
+static inline __m256d newton_raphson_step(__m256d x, __m256d r)
+{
+    const __m256d three = _mm256_set1_pd(3.0);
+    const __m256d half = _mm256_set1_pd(0.5);
+
+    // More accurate: t = 3 - x*r*r using FMA
+    __m256d rr = _mm256_mul_pd(r, r);
+    __m256d t = _mm256_fnmadd_pd(x, rr, three); // 3 - x*r*r
+
+    // r * (t/2) = r * t * 0.5
+    return _mm256_mul_pd(r, _mm256_mul_pd(t, half));
+}
+
+static inline __m256d rsqrt_pd_fast(__m256d x)
+{
+    // Pack all 4 doubles into one 128-bit float vector
+    __m128 f_packed = _mm256_cvtpd_ps(x);
+    __m128 r_packed = _mm_rsqrt_ps(f_packed);
+
+    // Handle zero masking
+    __m128 zero_f = _mm_setzero_ps();
+    __m128 mask_f = _mm_cmpneq_ps(f_packed, zero_f);
+    r_packed = _mm_and_ps(r_packed, mask_f);
+
+    // Convert back to doubles
+    __m128 r_lo = r_packed; // lower 2 floats
+    __m128 r_hi = _mm_shuffle_ps(r_packed, r_packed, _MM_SHUFFLE(3, 2, 3, 2));
+    __m128d r0_lo = _mm_cvtps_pd(r_lo);
+    __m128d r0_hi = _mm_cvtps_pd(r_hi);
+    __m256d r0 = _mm256_set_m128d(r0_hi, r0_lo);
+
+    // one Newton–Raphson refine
+    __m256d r1 = newton_raphson_step(x, r0);
+    // __m256d r2 = newton_raphson_step(x, r1);
+    // __m256d r3 = newton_raphson_step(x, r2);
+    // __m256d r4 = newton_raphson_step(x, r3);
+
+    return r1;
+}
+
+DLL_EXPORT void simd_ssa(double *restrict rvw1, double *restrict rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double *restrict rvw1_result, double *restrict rvw2_result, Profile *profiles, Branch *branches)
+{
+    __asm volatile("# LLVM-MCA-BEGIN simd_ssa" ::: "memory");
+#ifdef PROFILE
+    Profile *complete_function = &profiles[0], *before_loop = &profiles[1],
+            *impulse = &profiles[2], *delta = &profiles[3],
+            *velocity = &profiles[4], *after_loop = &profiles[5];
+#endif
+    START_PROFILE(complete_function);
+    START_PROFILE(before_loop);
+
+    /* ---------------- fetch & convert inputs to v3d ---------------- */
+    const double *const_rvw1 = (const double *)rvw1;
+    const double *const_rvw2 = (const double *)rvw2;
+
+    // TODO:change set to setr
+    __m256d i1_displacement_rvw1 = _mm256_set_pd(0.0, const_rvw1[2], const_rvw1[1], const_rvw1[0]);     // Load the displacement values with the last one being garbage
+    __m256d i2_displacement_rvw2 = _mm256_set_pd(0.0, const_rvw2[2], const_rvw2[1], const_rvw2[0]);     // Load the displacement values with the last one being garbage
+    __m256d i3_velocity_rvw1 = _mm256_set_pd(0.0, const_rvw1[5], const_rvw1[4], const_rvw1[3]);         // Load the velocity values with the last one being garbage
+    __m256d i4_velocity_rvw2 = _mm256_set_pd(0.0, const_rvw2[5], const_rvw2[4], const_rvw2[3]);         // Load the velocity values with the last one being garbage
+    __m256d i5_angular_velocity_rvw1 = _mm256_set_pd(0.0, const_rvw1[8], const_rvw1[7], const_rvw1[6]); // Load the angular velocity values with the last one being garbage
+    __m256d i6_angular_velocity_rvw2 = _mm256_set_pd(0.0, const_rvw2[8], const_rvw2[7], const_rvw2[6]); // Load the angular velocity values with the last one being garbage
+
+    /* --------------- axis basis ------------------------------------ */
+
+    __m256d i7_offset = _mm256_sub_pd(i2_displacement_rvw2, i1_displacement_rvw1); // p2-p1
+    __m256d i8_square = _mm256_mul_pd(i7_offset, i7_offset);                       // DOT PRODUCT: Square the offset vector
+    __m256d i9_half_add = _mm256_hadd_pd(i8_square, i8_square);                    // Half-add the squared components
+    __m128d i10_extract_hi = _mm256_extractf128_pd(i8_square, 1);                  // Extract the high part of the half-add result
+    double i11_result_lo = _mm256_cvtsd_f64(i9_half_add);                          // Convert the lowest part of the half-add result to double
+    double i12_result_hi = _mm_cvtsd_f64(i10_extract_hi);                          // Convert the lower part of the high part to double
+    double i13_dot_result = i11_result_lo + i12_result_hi;                         // Calculate the dot product
+    double i14_sqrt_result = sqrt(i13_dot_result);                                 // Calculate the square root of the dot product
+    double i15_inv_len = 1.0 / i14_sqrt_result;                                    // Calculate the inverse length
+    __m256d i16_set_inv_len = _mm256_set1_pd(i15_inv_len);                         // Set the inverse length in a vector
+    __m256d i17_forward = _mm256_mul_pd(i7_offset, i16_set_inv_len);               // [xx,xx,xx,xx] forward = offset * inv_len
+    // __m256d i18_up = _mm256_set_pd(0.0, 1.0, 0.0, 0.0);                                // [0,0,1,0] Set the up vector
+    __m256d i19_mask = _mm256_setr_pd(1.0, -1.0, 0.0, 0.0);                            // CROSS PRODUCT: The cross product mask for right vector calculation
+    __m256d i20_permute = _mm256_permute4x64_pd(i17_forward, _MM_SHUFFLE(0, 0, 0, 1)); // Permute the forward vector to match the right vector calculation
+    __m256d i21_right = _mm256_mul_pd(i19_mask, i20_permute);                          // [xx,xx,0,0] Calculate the right vector using the mask and permuted forward vector
+
+    /* --------------- local velocities ------------------------------ */
+
+    __m256d i22_square = _mm256_mul_pd(i3_velocity_rvw1, i21_right);   // DOT PRODUCT: Square the velocity vector with the right vector
+    __m256d i23_half_add = _mm256_hadd_pd(i22_square, i22_square);     // Half-add the squared components
+    __m128d i24_cast_lo = _mm256_castpd256_pd128(i23_half_add);        // Cast the low part of the half-add result to 128 bits
+    double i25_lvx1 = _mm_cvtsd_f64(i24_cast_lo);                      // Convert the lowest part of the half-add result to double
+    __m256d i26_square = _mm256_mul_pd(i3_velocity_rvw1, i17_forward); // DOT PRODUCT: Square the velocity vector with the forward vector
+    __m256d i27_half_add = _mm256_hadd_pd(i26_square, i26_square);     // Half-add the squared components
+    __m128d i28_cast_lo = _mm256_castpd256_pd128(i27_half_add);        // Cast the low part of the half-add result to 128 bits
+    __m128d i29_extract_hi = _mm256_extractf128_pd(i27_half_add, 1);   // Extract the high part of the half-add result
+    double i30_low = _mm_cvtsd_f64(i28_cast_lo);                       // Convert the lowest part of the half-add result to double
+    double i31_high = _mm_cvtsd_f64(i29_extract_hi);                   // Convert the lower part of the high part to double
+    double i32_lvy1 = i30_low + i31_high;                              // Calculate the y-component of the local velocity
+    __m256d i33_square = _mm256_mul_pd(i4_velocity_rvw2, i21_right);   // DOT PRODUCT: Square the velocity vector with the right vector
+    __m256d i34_half_add = _mm256_hadd_pd(i33_square, i33_square);     // Half-add the squared components
+    __m128d i35_cast_lo = _mm256_castpd256_pd128(i34_half_add);        // Cast the low part of the half-add result to 128 bits
+    double i36_lvx2 = _mm_cvtsd_f64(i35_cast_lo);                      // Convert the lowest part of the half-add result to double
+    __m256d i37_square = _mm256_mul_pd(i4_velocity_rvw2, i17_forward); // DOT PRODUCT: Square the velocity vector with the forward vector
+    __m256d i38_half_add = _mm256_hadd_pd(i37_square, i37_square);     // Half-add the squared components
+    __m128d i39_cast_lo = _mm256_castpd256_pd128(i38_half_add);        // Cast the low part of the half-add result to 128 bits
+    __m128d i40_extract_hi = _mm256_extractf128_pd(i38_half_add, 1);   // Extract the high part of the half-add result
+    double i41_low = _mm_cvtsd_f64(i39_cast_lo);                       // Convert the lowest part of the half-add result to double
+    double i42_high = _mm_cvtsd_f64(i40_extract_hi);                   // Convert the lower part of the high part to double
+    double i43_lvy2 = i41_low + i42_high;                              // Calculate the y-component of the local velocity
+
+    __m256d i44_square = _mm256_mul_pd(i5_angular_velocity_rvw1, i21_right);     // DOT PRODUCT: Square the angular velocity vector with the right vector
+    __m256d i45_half_add = _mm256_hadd_pd(i44_square, i44_square);               // Half-add the squared components
+    __m128d i46_cast_lo = _mm256_castpd256_pd128(i45_half_add);                  // Cast the low part of the half-add result to 128 bits
+    double i47_lax1 = _mm_cvtsd_f64(i46_cast_lo);                                // Convert the lowest part of the half-add result to double
+    __m256d i48_square = _mm256_mul_pd(i5_angular_velocity_rvw1, i17_forward);   // DOT PRODUCT: Square the angular velocity vector with the forward vector
+    __m256d i49_half_add = _mm256_hadd_pd(i48_square, i48_square);               // Half-add the squared components
+    __m128d i50_cast_lo = _mm256_castpd256_pd128(i49_half_add);                  // Cast the low part of the half-add result to 128 bits
+    __m128d i51_extract_hi = _mm256_extractf128_pd(i49_half_add, 1);             // Extract the high part of the half-add result
+    double i52_low = _mm_cvtsd_f64(i50_cast_lo);                                 // Convert the lowest part of the half-add result to double
+    double i53_high = _mm_cvtsd_f64(i51_extract_hi);                             // Convert the lower part of the high part to double
+    double i54_lay1 = i52_low + i53_high;                                        // Calculate the y-component of the local angular velocity
+    __m128d i55_extract_hi = _mm256_extractf128_pd(i5_angular_velocity_rvw1, 1); // DOT PRODUCT: Extract the high part of the angular velocity vector
+    double i56_laz1 = _mm_cvtsd_f64(i55_extract_hi);                             // Convert the high part of the angular velocity vector to double
+
+    __m256d i57_square = _mm256_mul_pd(i6_angular_velocity_rvw2, i21_right);     // DOT PRODUCT: Square the angular velocity vector with the right vector
+    __m256d i58_half_add = _mm256_hadd_pd(i57_square, i57_square);               // Half-add the squared components
+    __m128d i59_cast_lo = _mm256_castpd256_pd128(i58_half_add);                  // Cast the low part of the half-add result to 128 bits
+    double i60_lax2 = _mm_cvtsd_f64(i59_cast_lo);                                // Convert the lowest part of the half-add result to double
+    __m256d i61_square = _mm256_mul_pd(i6_angular_velocity_rvw2, i17_forward);   // DOT PRODUCT: Square the angular velocity vector with the forward vector
+    __m256d i62_half_add = _mm256_hadd_pd(i61_square, i61_square);               // Half-add the squared components
+    __m128d i63_cast_lo = _mm256_castpd256_pd128(i62_half_add);                  // Cast the low part of the half-add result to 128 bits
+    __m128d i64_extract_hi = _mm256_extractf128_pd(i62_half_add, 1);             // Extract the high part of the half-add result
+    double i65_low = _mm_cvtsd_f64(i63_cast_lo);                                 // Convert the lowest part of the half-add result to double
+    double i66_high = _mm_cvtsd_f64(i64_extract_hi);                             // Convert the lower part of the high part to double
+    double i67_lay2 = i65_low + i66_high;                                        // Calculate the y-component of the local angular velocity
+    __m128d i68_extract_hi = _mm256_extractf128_pd(i6_angular_velocity_rvw2, 1); // DOT PRODUCT: Extract the high part of the angular velocity vector
+    double i69_laz2 = _mm_cvtsd_f64(i68_extract_hi);                             // Convert the high part of the angular velocity vector to double
+
+    /* --------------- pre-loop scalars ------------------------------ */
+    const double i70_invM = 1.0 / M;
+    const double i71_C = 5.0 / (2.0 * M * R);
+
+    __m256d i72_invM_vec = _mm256_set1_pd(i70_invM); // [invM,invM,invM,invM] Set the inverse mass vector
+    __m256d i73_C_vec = _mm256_set1_pd(i71_C);       // [C,C,C,C] Set the C vector for angular velocity updates
+
+    __m256d i74_R = _mm256_setr_pd(R, -R, R, -R);                               // [R,-R,R,-R] Set the R vector for surface velocities
+    __m256d i75_sv_la = _mm256_setr_pd(i54_lay1, i47_lax1, i67_lay2, i60_lax2); // [lay1,lax1,lay2,lax2] Set the angular velocities for surface velocities
+    __m256d i76_sv_lv = _mm256_setr_pd(i25_lvx1, i32_lvy1, i36_lvx2, i43_lvy2); // [lvx1,lvy1,lvx2,lvy2] Set the linear velocities for surface velocities
+    __m256d i77_sv = _mm256_fmadd_pd(i74_R, i75_sv_la, i76_sv_lv);              // [svx1,svy1,svx2,svy2] Calculate the surface velocities
+
+    __m256d i78_sv_sqare = _mm256_mul_pd(i77_sv, i77_sv);                   // [svx1^2,svy1^2,svx2^2,svy2^2] Square the surface velocities
+    __m256d i79_svlen_partial = _mm256_hadd_pd(i78_sv_sqare, i78_sv_sqare); // Half-add the squared surface velocities
+    __m256d i80_svlen = rsqrt_pd_fast(i79_svlen_partial);                   // [svlen1,svlen1,svlen2,svlen2] Calculate the reciprocal square root of the half-added surface velocities. If the input is 0, output will be inf with sign of zero
+    __m256d i81_zero_vec = _mm256_setzero_pd();                             // [0,0,0,0] Initialize a zero vector for masking
+    // __m256d i82_mask = _mm256_cmp_pd(i79_svlen_partial, i81_zero_vec, _CMP_GT_OS); // Create a mask for the surface velocities
+    // __m256d i83_svlen = _mm256_blendv_pd(i81_zero_vec, i80_svlen_rsqrt, i82_mask); // [svlen1,svlen1,svlen2,svlen2] Blend the reciprocal square root with zero based on the mask
+
+    double i84_cpx = i25_lvx1 - i36_lvx2 - R * (i56_laz1 + i69_laz2);
+    double i85_cpz = R * (i47_lax1 + i60_lax2);
+    double i86_cp_len = sqrt(i84_cpx * i84_cpx + i85_cpz * i85_cpz);
+
+    double i87_vdiff = i43_lvy2 - i32_lvy1;
+
+    double i88_deltaP = deltaP; // Initialize deltaP
+    if (i88_deltaP == 0.0f)
+        i88_deltaP = 0.5 * (1.0 + e_b) * M * fabs(i87_vdiff) / N;
+
+    double i89_total_work = 0.0;
+    double i90_work_required = INFINITY;
+    double i91_work_compr = 0.0;
+
+    // double dP1 = i83_deltaP, dP2 = i83_deltaP;
+    // double dPx1 = 0, dPy1 = 0, dPx2 = 0, dPy2 = 0;
+    __m256d i92_dP_axis = _mm256_set1_pd(0); // [dPx1,dPy1,dPx2,dPy2] Initialize the dP axis vector
+    // __m256d i93_deltaP_vec = _mm256_set1_pd(i88_deltaP);               // Initialize deltaP vector for scaling
+    __m256d i94_u_s_vec = _mm256_setr_pd(u_s1, u_s1, -u_s2, -u_s2);    // [u_s1,u_s1,-u_s2,-u_s2] Set the u_s vector for scaling
+    __m256d i95_u_b_vec = _mm256_set1_pd(-u_b);                        // [-u_b,-u_b,-u_b,-u_b] Set the u_b vector for scaling
+    __m256d i96_deltaP_vec = _mm256_set1_pd(i88_deltaP);               // [deltaP,deltaP,deltaP,deltaP] Set the deltaP vector for scaling
+    __m256d i97_dP_first = _mm256_mul_pd(i95_u_b_vec, i96_deltaP_vec); // Calculate the first part of dP1
+    __m256d i98_dP1 = _mm256_set1_pd(i88_deltaP);                      // Declare the dP1 vector
+    __m256d i99_dP2 = _mm256_set1_pd(i88_deltaP);                      // Declare the dP2 vector
+    __m256d i100_cp_len_vec = _mm256_set1_pd(i86_cp_len);              // Set the contact point length vector for masking
+    __m256d i101_cpx_vec = _mm256_set1_pd(i84_cpx);                    // Set the contact point x vector
+    __m256d i102_cpz_vec = _mm256_set1_pd(i85_cpz);                    // Set the contact point z vector for masking
+    __m256d i103_comp_vec = _mm256_set1_pd(1e-16);                     // Set the contact point length comparison vector
+
+    END_PROFILE(before_loop);
+    int simd_debug_iter = 0;
+    /* ----------------------------- main loop ----------------------- */
+    while (i87_vdiff < 0.0 || i89_total_work < i90_work_required)
+    {
+        START_PROFILE(impulse);
+
+        __m256d i107_dP1_calc_partial = _mm256_mul_pd(i97_dP_first, i101_cpx_vec); // Calculate the first part of dP1
+        i98_dP1 = _mm256_div_pd(i107_dP1_calc_partial, i100_cp_len_vec);           // Divide the first part of dP1 by the contact point length
+        __m256d i108_dP2_calc_partial = _mm256_mul_pd(i97_dP_first, i102_cpz_vec); // Calculate the first part of dP2
+        i99_dP2 = _mm256_div_pd(i108_dP2_calc_partial, i100_cp_len_vec);           // Divide the first part of dP2 by the contact point length
+
+        __m256d i104_dP_axis_calc_partial = _mm256_mul_pd(i94_u_s_vec, i77_sv);                    // Calculate the first part of the dP axis vector
+        __m256d i105_dP_axis_calc_partial_2 = _mm256_mul_pd(i104_dP_axis_calc_partial, i80_svlen); // Scale the first part of the dP axis vector by the surface velocities
+        __m256d i106_dP_axis_calc = _mm256_mul_pd(i105_dP_axis_calc_partial_2, i99_dP2);           // Calculate the final dP axis vector
+
+        __m256d i109_is_dP2_gt_zero = _mm256_cmp_pd(i99_dP2, i81_zero_vec, _CMP_GT_OQ); // Compare dP2 with zero to check if it is greater than zero (inner branch)
+        __m256d iXXX_cpz_vec_abs = _mm256_set1_pd(fabs(i85_cpz));
+        __m256d i110_is_abs_cpz_lt_comp = _mm256_cmp_pd(iXXX_cpz_vec_abs, i103_comp_vec, _CMP_LT_OQ); // Compare the absolute value of cpz with 1e-16 to check if it is less than the comparison value (inner branch)
+        __m256d i111_is_cp_len_lt_comp = _mm256_cmp_pd(i100_cp_len_vec, i103_comp_vec, _CMP_LT_OQ);   // Compare cp_len with 1e-16 to check if it is less than the comparison value (outer branch)
+
+        // else -> else -> else branch
+        i92_dP_axis = _mm256_blend_pd(i81_zero_vec, i106_dP_axis_calc, 0b0011); // [dPx1,dPy1,0,0] Blend the dP axis vector with zero based on the mask
+        // else -> else -> if branch
+        __m256d i112_dP_axis_el_el_if = _mm256_blend_pd(i81_zero_vec, i106_dP_axis_calc, 0b1100); // [0,0,dPx2,dPy2] Blend the dP axis vector with zero based on the mask
+        i92_dP_axis = _mm256_blendv_pd(i92_dP_axis, i112_dP_axis_el_el_if, i109_is_dP2_gt_zero);  // If dP2 is greater than zero, blend the if branch into it
+        // else -> if branch
+        i99_dP2 = _mm256_blendv_pd(i99_dP2, i81_zero_vec, i110_is_abs_cpz_lt_comp);         // If the absolute value of cpz is less than 1e-16, set dP2 to zero
+        i92_dP_axis = _mm256_blendv_pd(i92_dP_axis, i81_zero_vec, i110_is_abs_cpz_lt_comp); // If the absolute value of cpz is less than 1e-16, set dP_axis to zero
+        // if branch
+        i98_dP1 = _mm256_blendv_pd(i98_dP1, i81_zero_vec, i111_is_cp_len_lt_comp);         // If cp_len is less than 1e-16, set dP1 to zero
+        i99_dP2 = _mm256_blendv_pd(i99_dP2, i81_zero_vec, i111_is_cp_len_lt_comp);         // If cp_len is less than 1e-16, set dP2 to zero
+        i92_dP_axis = _mm256_blendv_pd(i92_dP_axis, i81_zero_vec, i111_is_cp_len_lt_comp); // If cp_len is less than 1e-16, set dP_axis to zero
+
+        END_PROFILE(impulse);
+        START_PROFILE(delta);
+
+        /* linear velocity update (scalar) */
+        __m256d i113_vel_update_unpack = _mm256_unpacklo_pd(i98_dP1, i96_deltaP_vec);      // [dP1,deltaP,dP1,deltaP]
+        __m256d i114_sign_mask = _mm256_setr_pd(1.0, -1.0, -1.0, 1.0);                     // [1,-1,-1,1] Set the sign mask for the velocity update
+        __m256d i115_vel_update_1 = _mm256_mul_pd(i113_vel_update_unpack, i114_sign_mask); // [dP1,-deltaP,-dP1,deltaP] Calculate the first vector of the velocity update
+        __m256d i116_vel_update_2 = _mm256_add_pd(i115_vel_update_1, i92_dP_axis);         // [dp1+dPx1,-deltaP+dPy1,-dP1+dPx2,deltaP+dPy2]
+        // __m256d i117_vel_update_3 = _mm256_mul_pd(i116_vel_update_2, i72_invM_vec);        //
+        i76_sv_lv = _mm256_fmadd_pd(i116_vel_update_2, i72_invM_vec, i76_sv_lv); // Update the surface velocities with the velocity update
+
+        /* angular velocity update */
+        __m256d i118_ang_update_unpack = _mm256_unpacklo_pd(i81_zero_vec, i99_dP2);           // [0,dP2,0,dP2]
+        __m256d i119_sign_mask = _mm256_setr_pd(-1.0, 1.0, -1.0, 1.0);                        // [-1,1,-1,1] Set the sign mask for the angular velocity update
+        __m256d i120_ang_update_1 = _mm256_mul_pd(i92_dP_axis, i119_sign_mask);               // [-dPx1,dPy1,-dPx2,dPy2] Calculate the first vector of the angular velocity update
+        __m256d i121_ang_update_2 = _mm256_add_pd(i118_ang_update_unpack, i120_ang_update_1); //
+        // __m256d i122_ang_update_3 = _mm256_mul_pd(i121_ang_update_2, i73_C_vec);              //
+        i75_sv_la = _mm256_fmadd_pd(i121_ang_update_2, i73_C_vec, i75_sv_la); // Update the surface angular velocities with the angular velocity update
+
+        double i123_current_dP1 = _mm256_cvtsd_f64(i98_dP1); // Extract the current dP1 value from the vector
+        i56_laz1 += i71_C * (-i123_current_dP1);
+        i69_laz2 += i71_C * (-i123_current_dP1);
+
+        END_PROFILE(delta);
+        START_PROFILE(velocity);
+
+        /* recompute slips */
+        i77_sv = _mm256_fmadd_pd(i74_R, i75_sv_la, i76_sv_lv);
+
+
+        __m256d i123_sv_sqare = _mm256_mul_pd(i77_sv, i77_sv);                     // Square the surface velocities
+        __m256d i124_svlen_partial = _mm256_hadd_pd(i123_sv_sqare, i123_sv_sqare); // Half-add the squared components
+        i80_svlen = rsqrt_pd_fast(i124_svlen_partial);                             // [svlen1,svlen1,svlen2,svlen2] Calculate the reciprocal square root of the half-added surface velocities. If the input is 0, output will be inf with sign of zero
+        // __m256d i126_zero_vec = _mm256_setzero_pd();                                    // [0,0,0,0] Initialize a zero vector for masking
+        // __m256d i127_mask = _mm256_cmp_pd(i124_svlen_partial, i81_zero_vec, _CMP_GT_OS); // [mask1,mask1,mask2,mask2] Create a mask for the surface velocities
+        // i83_svlen = _mm256_blendv_pd(i81_zero_vec, i125_svlen_rsqrt, i127_mask);
+
+        double current_lv[4];
+        _mm256_storeu_pd(current_lv, i76_sv_lv); // [lvx1,lvy1,lvx2,lvy2] Store the current local velocities
+        i84_cpx = current_lv[0] - current_lv[2] - R * (i56_laz1 + i69_laz2);
+        i101_cpx_vec = _mm256_set1_pd(i84_cpx); // Set the contact point x vector for masking
+        double i128_current_lax1 = _mm256_cvtsd_f64(
+            _mm256_permute4x64_pd(i75_sv_la, 0x01));
+        double i129_current_lax2 = _mm256_cvtsd_f64(
+            _mm256_permute4x64_pd(i75_sv_la, 0x03));
+        i85_cpz = R * (i128_current_lax1 + i129_current_lax2);
+        i102_cpz_vec = _mm256_set1_pd(i85_cpz); // Set the contact point z vector for masking
+        i86_cp_len = sqrt(i84_cpx * i84_cpx + i85_cpz * i85_cpz);
+        i100_cp_len_vec = _mm256_set1_pd(i86_cp_len); // Set the contact point length vector for masking
+
+        double i130_vdiff_prev = i87_vdiff;
+        i87_vdiff = current_lv[3] - current_lv[1];
+        i89_total_work += 0.5 * i88_deltaP * fabs(i130_vdiff_prev + i87_vdiff);
+
+        if (i91_work_compr == 0.0 && i87_vdiff > 0.0)
+        {
+            i91_work_compr = i89_total_work;
+            i90_work_required = (1.0 + e_b * e_b) * i91_work_compr;
+        }
+        END_PROFILE(velocity);
+    }
+
+    /* ---------------------- write back results ---------------------- */
+    START_PROFILE(after_loop);
+
+    /* broadcast the local scalars once */
+    __m256d i131_bx1 = _mm256_permute4x64_pd(i76_sv_lv, 0b00000000);
+    __m256d i132_by1 = _mm256_permute4x64_pd(i76_sv_lv, 0b01010101);
+    __m256d i133_bx2 = _mm256_permute4x64_pd(i76_sv_lv, 0b10101010);
+    __m256d i134_by2 = _mm256_permute4x64_pd(i76_sv_lv, 0b11111111);
+
+    __m256d i135_bax1 = _mm256_permute4x64_pd(i75_sv_la, 0b01010101);
+    __m256d i136_bay1 = _mm256_permute4x64_pd(i75_sv_la, 0b00000000);
+    __m256d i137_baz1 = _mm256_set1_pd(i56_laz1);
+
+    __m256d i138_bax2 = _mm256_permute4x64_pd(i75_sv_la, 0b11111111);
+    __m256d i139_bay2 = _mm256_permute4x64_pd(i75_sv_la, 0b10101010);
+    __m256d i140_baz2 = _mm256_set1_pd(i69_laz2);
+
+    __m256d i141_up_v = _mm256_setr_pd(0.0, 0.0, 1.0, 0.0);
+
+    __m256d i142_wvel1 = _mm256_fmadd_pd(i21_right, i131_bx1, _mm256_mul_pd(i17_forward, i132_by1));
+    __m256d i143_wvel2 = _mm256_fmadd_pd(i21_right, i133_bx2, _mm256_mul_pd(i17_forward, i134_by2));
+
+    /* world angular velocity = right*lax + forward*lay + up*laz            */
+    __m256d i144_wang1 = _mm256_fmadd_pd(
+        i141_up_v, i137_baz1,
+        _mm256_fmadd_pd(i17_forward, i136_bay1, _mm256_mul_pd(i21_right, i135_bax1)));
+
+    __m256d i145_wang2 = _mm256_fmadd_pd(
+        i141_up_v, i140_baz2,
+        _mm256_fmadd_pd(i17_forward, i139_bay2, _mm256_mul_pd(i21_right, i138_bax2)));
+
+    // // /* store x,y,z from lanes 0,1,2                                         */
+    double tmp[4];
+
+    _mm256_storeu_pd(tmp, i142_wvel1); /* [x y z _] */
+    rvw1_result[3] = tmp[0];
+    rvw1_result[4] = tmp[1];
+    rvw1_result[5] = tmp[2];
+
+    _mm256_storeu_pd(tmp, i143_wvel2);
+    rvw2_result[3] = tmp[0];
+    rvw2_result[4] = tmp[1];
+    rvw2_result[5] = tmp[2];
+
+    _mm256_storeu_pd(tmp, i144_wang1);
+    rvw1_result[6] = tmp[0];
+    rvw1_result[7] = tmp[1];
+    rvw1_result[8] = tmp[2];
+
+    _mm256_storeu_pd(tmp, i145_wang2);
     rvw2_result[6] = tmp[0];
     rvw2_result[7] = tmp[1];
     rvw2_result[8] = tmp[2];
