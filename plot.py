@@ -200,7 +200,7 @@ for tc in all_tcs:
     ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=5, integer=True))
 
     # j) Titles, labels, grid
-    ax.set_xlabel("Average Cycles", fontsize=10)
+    ax.set_xlabel("Cycles", fontsize=10)
     ax.set_title(f"Average Cycles — {tc}", fontsize=12)
     ax.xaxis.grid(which="major", linestyle="--", linewidth=0.5, alpha=0.7)
 
@@ -254,7 +254,7 @@ ax.invert_yaxis()
 ax.xaxis.set_major_formatter(ticker.FuncFormatter(thousands_formatter))
 ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=5, integer=True))
 
-ax.set_xlabel("Average Cycles (averaged across all test cases)", fontsize=10)
+ax.set_xlabel("Cycles", fontsize=10)
 ax.set_title("Function — Mean Cycles Across All Test Cases", fontsize=12)
 ax.xaxis.grid(which="major", linestyle="--", linewidth=0.5, alpha=0.7)
 
@@ -263,17 +263,13 @@ plt.savefig("plots/benchmark_avg_all_cases_horizontal.png", dpi=150)
 plt.close(fig)
 ax.xaxis.grid(which="major", linestyle="--", linewidth=0.5, alpha=0.7)
 
-plt.tight_layout()
-plt.savefig("plots/benchmark_avg_all_cases_horizontal.png", dpi=150)
-plt.close(fig)
 
 
-flops = pd.read_csv("build/flops.csv")
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  X) COST & FLOPS: HORIZONTAL BAR IMPROVEMENTS
 # ─────────────────────────────────────────────────────────────────────────────
-
+flops = pd.read_csv("build/flops.csv")
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 
@@ -572,6 +568,174 @@ for func, data in flops.groupby("Function"):
     plt.tight_layout()
     plt.savefig(outfile, dpi=150)
     plt.close(fig)
+
+
+# 1) Read in flops.csv and profiling.csv, convert both "Test Case" to "TC X"
+# -----------------------------------------------------------------------------
+flops_df = pd.read_csv("build/flops.csv")
+if flops_df["Test Case"].dtype != object:
+    flops_df["Test Case"] = "TC " + flops_df["Test Case"].astype(str)
+
+prof_df = pd.read_csv("build/profiling.csv")
+if prof_df["Test Case"].dtype != object:
+    prof_df["Test Case"] = "TC " + prof_df["Test Case"].astype(str)
+
+# 2) Merge on (Function, Section, Test Case)
+# -----------------------------------------------------------------------------
+merged = pd.merge(
+    flops_df,
+    prof_df,
+    on=["Function", "Section", "Test Case"],
+    suffixes=("_flops", "_prof")
+)
+
+# 3) Compute FlopsPerCycle = Flops / Cycles (no "_prof" suffix)
+# -----------------------------------------------------------------------------
+merged["FlopsPerCycle"] = merged["Flops"] / merged["Cycles"]
+
+# Strip any whitespace from column names
+merged.columns = merged.columns.str.strip()
+
+# 4) Group by (Function, Test Case), taking mean of FlopsPerCycle
+# -----------------------------------------------------------------------------
+gp = (
+    merged
+    .groupby(["Function", "Test Case"])[["FlopsPerCycle"]]
+    .mean()
+    .reset_index()
+)
+
+# 5) Build a consistent color map for all Functions
+# -----------------------------------------------------------------------------
+all_funcs = sorted(gp["Function"].unique())
+cmap = plt.get_cmap("tab10")
+func_to_color_fp = {func: cmap(i % cmap.N) for i, func in enumerate(all_funcs)}
+
+# 6) Formatter for "k" on the x-axis
+# -----------------------------------------------------------------------------
+def thousands_formatter(x, pos):
+    val = x / 1000.0
+    if val.is_integer():
+        return f"{int(val)} k"
+    else:
+        return f"{val:.1f} k"
+
+# Ensure output directory exists
+os.makedirs("plots", exist_ok=True)
+
+# 7) Plot horizontal‐bar chart PER Test Case for FlopsPerCycle
+# -----------------------------------------------------------------------------
+all_tcs_fp = sorted(gp["Test Case"].unique(), key=lambda s: int(s.split()[-1]))
+
+for tc in all_tcs_fp:
+    sub = gp[gp["Test Case"] == tc].copy()
+    # Sort ascending so that highest FlopsPerCycle ends up at the top after invert_yaxis
+    sub_sorted = sub.sort_values("FlopsPerCycle", ascending=True).reset_index(drop=True)
+
+    funcs  = sub_sorted["Function"].tolist()
+    values = sub_sorted["FlopsPerCycle"].tolist()
+    y_pos  = np.arange(len(funcs))
+
+    fig_width  = 8
+    fig_height = len(funcs) * 0.4 + 1
+    fig, ax    = plt.subplots(figsize=(fig_width, fig_height))
+
+    # Draw one horizontal bar per function
+    for i, func in enumerate(funcs):
+        ax.barh(
+            y_pos[i],
+            values[i],
+            color=func_to_color_fp[func],
+            edgecolor="black",
+            height=0.35
+        )
+
+    max_val = max(values)
+    ax.set_xlim(0, max_val * 1.15)
+
+    # Annotate each bar with FlopsPerCycle to two decimal places
+    for i, val in enumerate(values):
+        ax.text(
+            val * 1.005,
+            i,
+            f"{val:.2f}",
+            va="center",
+            ha="left",
+            fontsize=9
+        )
+
+    ax.set_yticks(y_pos)
+    ax.set_yticklabels(funcs, fontsize=9)
+    ax.invert_yaxis()
+
+    ax.xaxis.set_major_formatter(ticker.FuncFormatter(thousands_formatter))
+    ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=5, integer=True))
+
+    ax.set_title(f"Flops Per Cycle — {tc}", fontsize=12)
+    ax.set_xlabel("Flops / Cycle", fontsize=10)
+    ax.xaxis.grid(which="major", linestyle="--", linewidth=0.5, alpha=0.7)
+
+    outfile = f"plots/flops_per_cycle_{tc.replace(' ', '_')}.png"
+    plt.tight_layout()
+    plt.savefig(outfile, dpi=150)
+    plt.close(fig)
+
+# 8) Plot "Average FlopsPerCycle across all Test Cases"
+# -----------------------------------------------------------------------------
+avg_fp = gp.groupby("Function")[["FlopsPerCycle"]].mean().reset_index()
+avg_sorted = avg_fp.sort_values("FlopsPerCycle", ascending=True).reset_index(drop=True)
+
+funcs  = avg_sorted["Function"].tolist()
+values = avg_sorted["FlopsPerCycle"].tolist()
+y_pos  = np.arange(len(funcs))
+
+fig_width  = 8
+fig_height = len(funcs) * 0.4 + 1
+fig, ax   = plt.subplots(figsize=(fig_width, fig_height))
+
+for i, func in enumerate(funcs):
+    ax.barh(
+        y_pos[i],
+        values[i],
+        color=func_to_color_fp[func],
+        edgecolor="black",
+        height=0.35
+    )
+
+max_val = max(values)
+ax.set_xlim(0, max_val * 1.15)
+
+for i, val in enumerate(values):
+    ax.text(
+        val * 1.005,
+        i,
+        f"{val:.2f}",
+        va="center",
+        ha="left",
+        fontsize=9
+    )
+
+ax.set_yticks(y_pos)
+ax.set_yticklabels(funcs, fontsize=9)
+ax.invert_yaxis()
+
+# ─── Remove the thousands_formatter ────────────────────────────────────────
+# Just let Matplotlib use the default float formatting:
+# ax.xaxis.set_major_formatter(ticker.FuncFormatter(thousands_formatter))
+# ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=5, integer=True))
+
+# Optionally, you can set a fixed number of decimal ticks manually, e.g.:
+ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=5, prune="both"))
+ax.xaxis.set_major_formatter(ticker.FormatStrFormatter("%.2f"))
+
+# ───────────────────────────────────────────────────────────────────────────
+ax.set_title("Function — Mean Flops Per Cycle Across All Test Cases", fontsize=12)
+ax.set_xlabel("Flops / Cycle (averaged across all test cases)", fontsize=10)
+ax.xaxis.grid(which="major", linestyle="--", linewidth=0.5, alpha=0.7)
+
+plt.tight_layout()
+plt.savefig("plots/flops_per_cycle_avg_all_cases.png", dpi=150)
+plt.close(fig)
 
 """
 
