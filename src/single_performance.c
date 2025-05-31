@@ -149,7 +149,7 @@ int main()
 
     setUp();
 
-    call_function(simd_collide_ball_2);
+    call_function(recip_sqrt);
 
     return 0;
 }

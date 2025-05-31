@@ -28,9 +28,10 @@ set(FLAGS
     -fno-math-errno
     -funroll-loops
     -ftree-vectorize
-    -fno-omit-frame-pointer
+    #-fno-omit-frame-pointer
+    
     #-flto          # Worsens
-    -g
+    #-g
 )
 
 add_library(pool_shared SHARED ${SOURCES})

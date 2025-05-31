@@ -64,7 +64,8 @@ DLL_EXPORT void simd_collide_ball_2(double* rvw1, double* rvw2, float R_float, f
 DLL_EXPORT void improved_symmetry_collide_balls(double* rvw1, double* rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double* rvw1_result, double* rvw2_result, Profile* profiles, Branch* branches);
 //DLL_EXPORT void SIMD_Full_basic(double* rvw1, double* rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double* rvw1_result, double* rvw2_result, Profile* profiles, Branch* branches);
 DLL_EXPORT void simd_scalar_loop(double* rvw1, double* rvw2, float R_float, float M_float, float u_s1_float, float u_s2_float, float u_b_float, float e_b_float, float deltaP_float, int N_int, double* rvw1_result, double* rvw2_result, Profile* profiles, Branch* branches);
-
+DLL_EXPORT void recip_sqrt_hoist(double* rvw1, double* rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double* rvw1_result, double* rvw2_result, Profile* profiles, Branch* branches);
+DLL_EXPORT void simd_ssa(double *restrict rvw1, double *restrict rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double *restrict rvw1_result, double *restrict rvw2_result, Profile *profiles, Branch *branches);
 DLL_EXPORT void recip_sqrt_better_ifs(double* rvw1, double* rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double* rvw1_result, double* rvw2_result, Profile* profiles, Branch* branches);
 DLL_EXPORT void recip_sqrt_less_if(double* rvw1, double* rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double* rvw1_result, double* rvw2_result, Profile* profiles, Branch* branches);
 

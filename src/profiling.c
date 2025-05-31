@@ -8,7 +8,7 @@
 #include "unity.h"
 #include "pool.h"
 
-#define WARMUP 0
+#define WARMUP 100
 #define ITERATIONS 10000
 #define TEST_RUNNER_ITERATIONS 3      // Rerun all TestCases (so warmup + iterations) in Random Order
 #define FLUSH_SIZE (32 * 1024 * 1024) // 32MB buffer
@@ -305,12 +305,15 @@ void test_approx_sqrt(void)
 {
     call_function("scalar Less SQRT + Approx", approxsq_collide_balls);
 }
-void test_approx_symmetry(void)
-{
+void test_recip_sqrt(void) {
     call_function("Reciprocal Sqrt", recip_sqrt);
 }
-void test_recip_sqrt_ifs(void)
-{
+
+void test_recip_sqrt_hoist(void) {
+    call_function("Reciprocal Sqrt Hoist", recip_sqrt_hoist);
+}
+
+void test_recip_sqrt_ifs(void) {
     call_function("Reciprocal Sqrt IF", recip_sqrt_better_ifs);
 }
 
@@ -341,6 +344,11 @@ void test_improved_symmetry(void)
     call_function("Improved Symmetry", improved_symmetry_collide_balls);
 }
 
+void test_simd_ssd(void)
+{
+     call_function("SIMD SSD", simd_ssa);
+}
+
 int main()
 {
 #ifdef _WIN32
@@ -364,19 +372,22 @@ int main()
     srand((unsigned int)time(NULL));
 
     void (*tests[])(void) = {
-        test_collide_balls_basic,
-        test_scalar_sqrt,
-        test_approx_sqrt,
-        test_approx_symmetry,
-        test_collide_balls_simd,
-        test_collide_balls_code_motion,
-        test_simd_collide_ball_2,
-        test_improved_symmetry,
-        test_collide_balls_simd2,
-        test_collide_balls_simd3,
-        test_register_relieve,
-        test_recip_sqrt_ifs,
-        test_recip_sqrt_less_ifs};
+      //  test_collide_balls_basic,
+        //test_scalar_sqrt,
+     //   test_approx_sqrt,
+    //    test_recip_sqrt,
+      //  test_collide_balls_simd,
+      //  test_collide_balls_code_motion,
+        //test_simd_collide_ball_2,
+       // test_improved_symmetry,
+        //test_collide_balls_simd2,
+        //test_collide_balls_simd3,
+      //  test_register_relieve,
+      //  test_recip_sqrt_ifs,
+       // test_recip_sqrt_less_ifs,
+        test_simd_ssd,
+        //test_recip_sqrt_hoist,
+    };
 
     const char *function_names[] = {
         "Basic Implementation",
@@ -391,7 +402,10 @@ int main()
         "SIMD scalar loop",
         "Register Relieve",
         "Reciprocal Sqrt IF",
-        "Reciprocal Sqrt Less IF"};
+        "Reciprocal Sqrt Less IF",
+        "Reciprocal Sqrt Hoist",
+        "SIMD SSD",
+    };
 
 #define NUM_FUNCTIONS (sizeof(tests) / sizeof(tests[0]))
 
