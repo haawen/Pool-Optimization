@@ -267,152 +267,313 @@ plt.tight_layout()
 plt.savefig("plots/benchmark_avg_all_cases_horizontal.png", dpi=150)
 plt.close(fig)
 
-## Cost
-for opi, op in enumerate(["ADDS", "MULS", "DIVS", "SQRT"]):
-    fig, ax = plt.subplots(figsize=(12, 6))  # This gives both fig and ax
 
-    cols = []
-    x = np.arange(len(flops["Section"].value_counts()))
-    width = 0.25
-    multiplier = 0
+flops = pd.read_csv("build/flops.csv")
 
-    for label, group in flops.groupby("Section"):
-        cols.append(label)
-        data = group.groupby("Function")[op].mean()
+# ─────────────────────────────────────────────────────────────────────────────
+#  X) COST & FLOPS: HORIZONTAL BAR IMPROVEMENTS
+# ─────────────────────────────────────────────────────────────────────────────
 
-        offset = 0  # width * multiplier
+import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 
-        for i, f in enumerate(data.index):
-            rects = plt.bar(
-                x[multiplier] + offset,
-                data.values[i],
-                width,
-                label=f"{f}",
-                color=color_styles[f],
+# (If you haven’t already read flops earlier, uncomment the next line:)
+# flops = pd.read_csv("build/flops.csv")
+
+# You already have `color_styles` defined. We’ll use `section_colors` and
+# `op_colors` from your existing code for the new horizontal plots.
+
+op_colors = {
+    "ADDS":      "green",
+    "MULS":      "blue",
+    "DIVS":      "orange",
+    "SQRT":      "red",     # changed to lowercase “red” for consistency
+}
+
+section_colors = {
+    "Initialization":        "green",
+    "Impulse":               "blue",
+    "Delta":                 "orange",
+    "Velocity":              "purple",
+    "Transform to World Frame": "red",
+    "collide_balls":         "black",
+}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Helper: format x-axis ticks in “k” (thousands)
+# ─────────────────────────────────────────────────────────────────────────────
+def thousands_formatter(x, pos):
+    """
+    Turn a raw number like 50000 → “50 k”, 75432 → “75.4 k”, etc.
+    Used by FuncFormatter.
+    """
+    val = x / 1000.0
+    if val.is_integer():
+        return f"{int(val)} k"
+    else:
+        return f"{val:.1f} k"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  (1) COST PER OPERATION — Horizontal Bars, Thicker
+# ─────────────────────────────────────────────────────────────────────────────
+section_colors = {
+    "Initialization":           "green",
+    "Impulse":                  "blue",
+    "Delta":                    "orange",
+    "Velocity":                 "purple",
+    "Transform to World Frame": "red",
+    "collide_balls":            "black",
+}
+
+def thousands_formatter(x, pos):
+    """
+    Convert 50000 → '50 k', 75432 → '75.4 k'.
+    Used by FuncFormatter.
+    """
+    val = x / 1000.0
+    if val.is_integer():
+        return f"{int(val)} k"
+    else:
+        return f"{val:.1f} k"
+
+for op in ["ADDS", "MULS", "DIVS", "SQRT"]:
+    # 1) Compute mean operation count per (Function, Section)
+    cost_grouped = (
+        flops.groupby(["Function", "Section"])[[op]]
+              .mean()
+              .reset_index()
+    )
+    pivot = cost_grouped.pivot(index="Function", columns="Section", values=op).fillna(0)
+
+    functions = pivot.index.tolist()   # e.g. ["Basic Implementation", "Code Motion", …]
+    sections  = pivot.columns.tolist()  # e.g. ["Initialization", "Impulse", "Delta", …]
+
+    N_funcs = len(functions)
+    N_secs  = len(sections)
+
+    # 2) Decide how tall each cluster is, and how big a gap to leave BETWEEN clusters:
+    cluster_height = 1.0             # inches of “height” per function‐cluster
+    bar_height     = cluster_height / N_secs
+    gap_between    = 1.0             # inches of blank whitespace BETWEEN clusters
+
+    # 3) We’ll treat each “cluster center” as at y = i * (cluster_height + gap_between)
+    #    Then drawing uses these y-coordinates directly (in data units).
+    cluster_spacing = cluster_height + gap_between
+    y_centers = np.arange(N_funcs) * cluster_spacing
+
+    # 4) Compute figure height: we need to allow up to the last cluster center + half cluster_height,
+    #    plus a little extra margin at top.  (We work in inches here, since figsize is in inches.)
+    fig_width = 10
+    fig_height = N_funcs * cluster_spacing + 0.5  # extra 0.5" top margin
+    fig, ax   = plt.subplots(figsize=(fig_width, fig_height))
+
+    # 5) Draw bars for each section at the appropriate offset within each cluster:
+    for sec_idx, sec in enumerate(sections):
+        counts = pivot[sec].values  # length = N_funcs
+        # Each bar’s y-position = cluster_center + offset
+        y_positions = y_centers + sec_idx * bar_height - (cluster_height/2) + (bar_height/2)
+
+        ax.barh(
+            y_positions,
+            counts,
+            height=bar_height * 0.9,  # leave a 10% vertical gap between sub-bars
+            color=section_colors.get(sec, "gray"),
+            edgecolor="black",
+            label=sec
+        )
+
+    # 6) Draw faint horizontal divider lines (in that gap_between) at halfway between clusters:
+    for i in range(N_funcs - 1):
+        # Divider sits midway between y_centers[i] + (cluster_height/2) and y_centers[i+1] - (cluster_height/2).
+        # That midpoint is y_centers[i] + (cluster_height/2) + (gap_between/2).
+        divider_y = y_centers[i] + (cluster_height/2) + (gap_between/2)
+        ax.axhline(divider_y, color="gray", linestyle="--", linewidth=0.5, alpha=0.5)
+
+    # 7) Expand x‐limit so annotations never run off
+    max_count = pivot.values.max()
+    ax.set_xlim(0, max_count * 1.15)
+
+    # 8) Annotate every bar—if count > 0, print near its right; if count = 0, print “0” near left edge:
+    for func_idx, func in enumerate(functions):
+        for sec_idx, sec in enumerate(sections):
+            val = pivot.loc[func, sec]
+
+            if val > 0:
+                x_pos = val * 1.005
+            else:
+                # Place “0” just inside the left margin (5% of max_count)
+                x_pos = max_count * 0.005
+
+            # y‐position for this particular sub‐bar
+            y_pos = y_centers[func_idx] + sec_idx * bar_height - (cluster_height/2) + (bar_height/2)
+
+            ax.text(
+                x_pos,
+                y_pos,
+                f"{int(round(val, 0))}",
+                va="center",
+                ha="left",
+                fontsize=9,
+                color="black"
             )
-            plt.bar_label(rects, padding=3, rotation=45)
-            offset += width
 
-        multiplier += 1
+    # 9) Set y‐ticks at the cluster centers, label them with function names, and invert so top = largest:
+    ax.set_yticks(y_centers)
+    ax.set_yticklabels(functions, fontsize=10)
+    ax.invert_yaxis()
 
-    plt.xlabel("Section")
-    plt.xticks(x + width, cols)
-    plt.yscale("log")  # Only set the Y-axis to log scale
-    plt.ylabel(f"{op} Count")
-    plt.title(f"Cost Evaluation {op}")
+    # 10) Format x‐axis ticks as “k” with at most 5 major ticks
+    ax.xaxis.set_major_formatter(ticker.FuncFormatter(thousands_formatter))
+    ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=5, integer=True))
 
-    handles, labels = ax.get_legend_handles_labels()
-    by_label = dict(zip(labels, handles))
-    ax.legend(by_label.values(), by_label.keys(), title="Function")
+    # 11) Labels, title, grid, and legend (legend outside)
+    ax.set_xlabel(f"{op} Count", fontsize=12)
+    ax.set_title(f"Cost Evaluation — {op}", fontsize=14)
+    ax.xaxis.grid(which="major", linestyle="--", linewidth=0.5, alpha=0.7)
 
+    ax.legend(
+        title="Section",
+        bbox_to_anchor=(1.02, 1),
+        loc="upper left",
+        fontsize=10,
+        title_fontsize=12,
+        frameon=False
+    )
+
+    # 12) Save and close
+    outfile = f"plots/Cost_{op}_horizontal.png"
     plt.tight_layout()
+    plt.savefig(outfile, dpi=150)
+    plt.close(fig)
 
-    plt.savefig(f"plots/Cost{op}.png")
-    plt.close()
 
 
-# Cost per func
-#
+# ─────────────────────────────────────────────────────────────────────────────
+#  (2) COST PER FUNCTION — Horizontal Bars, Thicker
+# ─────────────────────────────────────────────────────────────────────────────
+
 op_colors = {
     "ADDS": "green",
     "MULS": "blue",
     "DIVS": "orange",
-    "SQRT": "RED",
+    "SQRT": "red",
 }
 
-section_colors = {
-    "Initialization": "green",
-    "Impulse": "blue",
-    "Delta": "orange",
-    "Velocity": "purple",
-    "Transform to World Frame": "red",
-    "collide_balls": "black",
-}
+def thousands_formatter(x, pos):
+    val = x / 1000.0
+    if val.is_integer():
+        return f"{int(val)} k"
+    else:
+        return f"{val:.1f} k"
 
+for func, data in flops.groupby("Function"):
+    groups = (
+        data.groupby("Section")[["ADDS", "MULS", "DIVS", "SQRT"]]
+            .mean()
+            .reset_index()
+    )
+    sections   = groups["Section"].tolist()      # e.g. ["Initialization","Impulse",…]
+    operations = ["ADDS", "MULS", "DIVS", "SQRT"]
+    N_secs     = len(sections)
+    N_ops      = len(operations)
 
-def bar_plot_by_testcase(column, width=0.125, log=True, roundv=True):
-    tc = list(df["Test Case"].unique())
-    sections = section_colors.keys()
-    x = np.arange(len(tc))
+    # 1) Thicken cluster and add big gap between sections
+    cluster_height = 1.0           # each section’s cluster is 1" tall
+    bar_height     = cluster_height / N_ops
+    gap_between    = 0.5           # <- full 1" gap between adjacent sections
 
-    for f, data in df.groupby("Function"):
-        groups = data.groupby(["Test Case", "Section"])[[column]].mean()
+    cluster_spacing = cluster_height + gap_between
+    y_centers = np.arange(N_secs) * cluster_spacing
 
-        fig, ax = plt.subplots(figsize=(20, 6))
+    # 2) Compute figure height: last cluster center + half cluster_height + margin
+    fig_width  = 8
+    fig_height = N_secs * cluster_spacing + 0.5
+    fig, ax    = plt.subplots(figsize=(fig_width, fig_height))
 
-        for testcase in tc:
-            offset = -len(sections) / 2 * width
-            for section in sections:
-                rects = plt.bar(
-                    x[tc.index(testcase)] + offset,
-                    round(groups.loc[(testcase, section), column])
-                    if roundv
-                    else groups.loc[(testcase, section), column],
-                    width=width,
-                    label=section,
-                    color=section_colors[section],
-                )
-                plt.bar_label(rects, padding=3, rotation=45)
-                offset += width
+    # 3) Draw bars for each operation within a section cluster
+    for op_idx, op in enumerate(operations):
+        vals = groups[op].values  # length = N_secs
+        y_positions = (
+            y_centers
+            + op_idx * bar_height
+            - (cluster_height / 2)
+            + (bar_height / 2)
+        )
+        ax.barh(
+            y_positions,
+            vals,
+            height=bar_height * 0.9,  # 10% vertical gap between sub-bars
+            color=op_colors.get(op, "gray"),
+            edgecolor="black",
+            label=op
+        )
 
-        plt.xlabel("Testcase")
-        plt.xticks(x, tc)
-        if log:
-            plt.yscale("log")  # Only set the Y-axis to log scale
-        plt.ylabel(column)
+    # 4) Dashed dividers between section clusters
+    for i in range(N_secs - 1):
+        divider_y = y_centers[i] + (cluster_height / 2) + (gap_between / 2)
+        ax.axhline(divider_y, color="gray", linestyle="--", linewidth=0.5, alpha=0.5)
 
-        handles, labels = ax.get_legend_handles_labels()
-        by_label = dict(zip(labels, handles))
-        ax.legend(by_label.values(), by_label.keys(), title="Section")
+    # 5) Expand x-limit so "0" labels fit
+    max_count = groups[operations].values.max()
+    ax.set_xlim(0, max_count * 1.15)
 
-        plt.tight_layout()
-
-        plt.savefig(f"plots/{column}_{f}.png")
-        plt.close()
-
-
-bar_plot_by_testcase("Cycles")
-bar_plot_by_testcase("FlopsPerCycle", log=False, roundv=False)
-
-
-for f, data in flops.groupby("Function"):
-    groups = data.groupby(["Section"])[["ADDS", "MULS", "DIVS", "SQRT"]].mean()
-
-    fig, ax = plt.subplots(figsize=(12, 6))  # This gives both fig and ax
-
-    width = 0.1
-
-    x = np.arange(len(flops["Section"].value_counts()))
-
-    for i, section in enumerate(section_colors.keys()):
-        # for i, section in enumerate(groups.index):
-        offset = 0
-        for vi, v in enumerate(["ADDS", "MULS", "DIVS", "SQRT"]):
-            rects = plt.bar(
-                x[i] + offset,
-                groups.loc[section, v],
-                width=width,
-                label=v,
-                color=op_colors[v],
+    # 6) Annotate every bar (even zeros)
+    for sec_idx, sec in enumerate(sections):
+        for op_idx, op in enumerate(operations):
+            val = groups.loc[sec_idx, op]
+            if val > 0:
+                x_pos = val * 1.005
+            else:
+                x_pos = max_count * 0.005
+            y_pos = (
+                y_centers[sec_idx]
+                + op_idx * bar_height
+                - (cluster_height / 2)
+                + (bar_height / 2)
             )
-            plt.bar_label(rects, padding=3, rotation=45)
-            offset += width
+            ax.text(
+                x_pos,
+                y_pos,
+                f"{int(round(val, 0))}",
+                va="center",
+                ha="left",
+                fontsize=9,
+                color="black"
+            )
 
-    plt.xlabel("Section")
-    plt.xticks(x, section_colors.keys())
-    plt.yscale("log")  # Only set the Y-axis to log scale
-    plt.ylabel("Operation Count")
-    plt.title(f"Cost Evaluation for {f}")
+    # 7) Flip y-axis, label sections
+    ax.set_yticks(y_centers)
+    ax.set_yticklabels(sections, fontsize=10)
+    ax.invert_yaxis()
 
-    handles, labels = ax.get_legend_handles_labels()
-    by_label = dict(zip(labels, handles))
-    ax.legend(by_label.values(), by_label.keys(), title="Operation")
+    # 8) Format x-axis in "k"
+    ax.xaxis.set_major_formatter(ticker.FuncFormatter(thousands_formatter))
+    ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=5, integer=True))
 
+    # 9) Labels, title, grid, legend
+    ax.set_xlabel("Operation Count", fontsize=12)
+    ax.set_title(f"Cost Evaluation for {func}", fontsize=14)
+    ax.xaxis.grid(which="major", linestyle="--", linewidth=0.5, alpha=0.7)
+
+    ax.legend(
+        title="Operation",
+        bbox_to_anchor=(1.02, 1),
+        loc="upper left",
+        fontsize=10,
+        title_fontsize=12,
+        frameon=False
+    )
+
+    # 10) Save figure
+    safe_name = func.replace(" ", "_")
+    outfile = f"plots/Cost_{safe_name}_horizontal.png"
     plt.tight_layout()
+    plt.savefig(outfile, dpi=150)
+    plt.close(fig)
 
-    plt.savefig(f"plots/Cost_{f}.png")
-    plt.close()
-
+"""
 
 # TODO: calcualte peak performance based on COST values and operations / ports, then plot
 # TODO: Add port info per instruction
@@ -462,3 +623,4 @@ plt.legend()
 plt.tight_layout()
 plt.savefig("plots/roofline.png")
 plt.close()
+"""
