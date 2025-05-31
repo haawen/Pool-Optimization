@@ -480,7 +480,7 @@ if __name__ == "__main__":
         reference[0].N,
     )
 
-    data = []
+    data = [["Function", "Test Case", "Iteration", "Cycles"]]
     iters = 10000
     for j in range(len(reference)):
         for i in range(iters):

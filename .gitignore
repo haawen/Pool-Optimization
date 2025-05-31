@@ -15,3 +15,5 @@ toolchain.cmake
 .DS_Store
 venv/
 src/pool copy.c
+
+__pycache__
