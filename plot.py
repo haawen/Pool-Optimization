@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import os
 
 print(
     "Make sure to have run flops and profiling before plotting. Flops needs only be run when flop count changes."
@@ -35,12 +36,12 @@ grouped["Group"] = grouped["Function"] + " | " + grouped["Section"]
 color_styles = {
     "Default": "o",
     "Basic Implementation": "blue",
-   # "Code Motion": "green",
+    "Code Motion": "green",
     "Less SQRT": "purple",
     "Less SQRT 2": "orchid",
     "Branch Pred": "grey",
     "Removed Unused Branches": "#aec6cf",
-   # "SIMD": "orange",
+    "SIMD": "orange",
     "Precompute": "gold",
     "Scalar Improvements": "red",
     "Scalar Less SQRT": "firebrick",
@@ -51,7 +52,7 @@ color_styles = {
     "Reciprocal Sqrt Less IF": "chocolate",
     "Full SIMD": "DarkOliveGreen",
     "SIMD scalar loop": "DarkGoldenRod",
-   # "SIMD Optimized Impulse": "DarkViolet",
+    "SIMD Optimized Impulse": "DarkViolet",
     "Improved Symmetry": "DarkSeaGreen",
     "Register Relieve": "DarkSlateGray",
     "Reciprocal Sqrt Hoist": "Yellow",
@@ -118,6 +119,72 @@ plt.title(f"Cycles Benchmark")
 
 plt.savefig(f"plots/benchmark.png")
 plt.close()
+
+# Make sure the output directory exists
+os.makedirs("plots", exist_ok=True)
+
+# Read and preprocess
+df = pd.read_csv("build/benchmark.csv")
+df["Test Case"] = "TC " + df["Test Case"].astype(str)
+
+# Compute average cycles per (Function, Test Case)
+grouped = (
+    df.groupby(["Function", "Test Case"])[["Cycles"]]
+      .mean()
+      .reset_index()
+)
+
+# 1) Plot one horizontal‐bar chart PER test case
+all_tcs = sorted(grouped["Test Case"].unique(), key=lambda s: int(s.split()[-1]))
+
+plt.rcParams.update({'figure.autolayout': True})  # ensure tight layout
+
+for tc in all_tcs:
+    subset = grouped[grouped["Test Case"] == tc].copy()
+    subset_sorted = subset.sort_values("Cycles", ascending=False).reset_index(drop=True)
+
+    functions = subset_sorted["Function"].tolist()
+    cycles_vals = subset_sorted["Cycles"].tolist()
+    y_pos = np.arange(len(functions))
+
+    fig, ax = plt.subplots(figsize=(6, len(functions)*0.4 + 1))
+    ax.barh(y_pos, cycles_vals, color="C0", edgecolor="black")
+    for i, val in enumerate(cycles_vals):
+        ax.text(val * 1.005, i, f"{int(round(val,0))}", va="center", ha="left", fontsize=9)
+
+    ax.set_yticks(y_pos)
+    ax.set_yticklabels(functions, fontsize=9)
+    ax.invert_yaxis()
+
+    ax.set_xlabel("Average Cycles", fontsize=10)
+    ax.set_title(f"Average Cycles — {tc}", fontsize=12)
+    ax.xaxis.grid(which="major", linestyle="--", linewidth=0.5, alpha=0.7)
+
+    outfile = f"plots/benchmark_{tc.replace(' ', '_')}_horizontal.png"
+    plt.tight_layout()
+    plt.savefig(outfile, dpi=150)
+    plt.close(fig)
+
+# 2) (Optional) Plot “Average Across All Test Cases” as before
+avg_all = grouped.groupby("Function")[["Cycles"]].mean().reset_index()
+avg_all_sorted = avg_all.sort_values("Cycles", ascending=False).reset_index(drop=True)
+
+fig, ax = plt.subplots(figsize=(6, len(avg_all_sorted)*0.4 + 1))
+y_pos = np.arange(len(avg_all_sorted))
+ax.barh(y_pos, avg_all_sorted["Cycles"], color="C1", edgecolor="black")
+for i, val in enumerate(avg_all_sorted["Cycles"]):
+    ax.text(val * 1.005, i, f"{int(round(val,0))}", va="center", ha="left", fontsize=9)
+
+ax.set_yticks(y_pos)
+ax.set_yticklabels(avg_all_sorted["Function"], fontsize=9)
+ax.invert_yaxis()
+ax.set_xlabel("Average Cycles (averaged across all test cases)", fontsize=10)
+ax.set_title("Function — Mean Cycles Across All Test Cases", fontsize=12)
+ax.xaxis.grid(which="major", linestyle="--", linewidth=0.5, alpha=0.7)
+
+plt.tight_layout()
+plt.savefig("plots/benchmark_avg_all_cases_horizontal.png", dpi=150)
+plt.close(fig)
 
 ## Cost
 for opi, op in enumerate(["ADDS", "MULS", "DIVS", "SQRT"]):

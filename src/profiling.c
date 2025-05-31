@@ -372,21 +372,21 @@ int main()
     srand((unsigned int)time(NULL));
 
     void (*tests[])(void) = {
-      //  test_collide_balls_basic,
+        test_collide_balls_basic,
         //test_scalar_sqrt,
-     //   test_approx_sqrt,
+        test_approx_sqrt,
     //    test_recip_sqrt,
       //  test_collide_balls_simd,
-      //  test_collide_balls_code_motion,
+        test_collide_balls_code_motion,
         //test_simd_collide_ball_2,
        // test_improved_symmetry,
         //test_collide_balls_simd2,
         //test_collide_balls_simd3,
-      //  test_register_relieve,
+        test_register_relieve,
       //  test_recip_sqrt_ifs,
-       // test_recip_sqrt_less_ifs,
+        test_recip_sqrt_less_ifs,
         test_simd_ssd,
-        //test_recip_sqrt_hoist,
+        test_recip_sqrt_hoist,
     };
 
     const char *function_names[] = {
