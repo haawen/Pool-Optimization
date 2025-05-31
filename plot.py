@@ -1,36 +1,12 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 import os
 
 print(
     "Make sure to have run flops and profiling before plotting. Flops needs only be run when flop count changes."
 )
-
-
-flops = pd.read_csv("build/flops.csv")
-
-df = pd.read_csv("build/profiling.csv")
-
-df = pd.merge(flops, df, on=["Function", "Section", "Test Case"])
-df["Test Case"] = "TC " + df["Test Case"].astype(str)
-df["FlopsPerCycle"] = df["Flops"] / df["Cycles"]
-
-df.columns = df.columns.str.strip()
-
-benchmark = pd.read_csv("build/benchmark.csv")
-benchmark["Test Case"] = "TC " + benchmark["Test Case"].astype(str)
-benchmark.columns = benchmark.columns.str.strip()
-
-# Group by Function, Section, and Test Case
-grouped = (
-    df.groupby(["Function", "Section", "Test Case"])[
-        ["Cycles", "Flops", "Memory", "ADDS", "MULS", "DIVS", "SQRT"]
-    ]
-    .mean()
-    .reset_index()
-)
-grouped["Group"] = grouped["Function"] + " | " + grouped["Section"]
 
 # dont put dark colors
 color_styles = {
@@ -59,66 +35,7 @@ color_styles = {
     "SIMD SSD": "DarkTurquoise",
 }
 
-fig, ax = plt.subplots(figsize=(12, 6))  # This gives both fig and ax
-x = np.arange(len(benchmark["Test Case"].value_counts()))
-cols = []
-ranking = {}
-for i, (tc, group) in enumerate(benchmark.groupby("Test Case")):
-    sub = group.groupby("Function")[["Cycles"]].mean()
-    sub = sub.sort_values("Cycles", ascending=False)  # Sort by cycles descending
-    functions = len(sub.index)
-    width = 0.1
-    cols.append(tc)
 
-    offset = -functions / 2 * width
-    r = 1
-    for f in sub.index:
-        if f not in ranking:
-            ranking[f] = []
-        ranking[f].append(r)
-        r += 1
-
-        cycles = sub.loc[f, "Cycles"]
-        rects = plt.bar(
-            x[i] + offset,
-            cycles,
-            width,
-            label=f"{f}",
-            color=color_styles[f],
-        )
-
-        plt.bar_label(rects, padding=3, rotation=45)
-        offset += width
-
-handles, labels = ax.get_legend_handles_labels()
-by_label = dict(zip(labels, handles))
-num_funcs = len(benchmark["Function"].unique())
-
-# Compute mean ranks and reverse rank (so lower rank = higher value)
-ranked_items = [
-    (key, (num_funcs + 1 - np.mean(ranking[key])), by_label[key]) for key in by_label
-]
-
-# Sort by computed mean rank descending
-ranked_items.sort(key=lambda x: x[1], reverse=True)
-
-# Unpack sorted handles and labels
-sorted_labels = [f"{rank:.2f} - {key}" for key, rank, _ in ranked_items]
-sorted_handles = [handle for _, _, handle in ranked_items]
-
-# Assign to legend
-ax.legend(sorted_handles, sorted_labels, title="Mean Rank - Function")
-
-# print(by_label.keys())
-
-plt.xlabel("")
-plt.xticks(x, cols)
-plt.yscale("log")  # Only set the Y-axis to log scale
-plt.ylabel(f"Cycles")
-plt.title(f"Cycles Benchmark")
-
-plt.savefig(f"plots/benchmark.png")
-plt.close()
 
 # Make sure the output directory exists
 os.makedirs("plots", exist_ok=True)
@@ -134,52 +51,216 @@ grouped = (
       .reset_index()
 )
 
-# 1) Plot one horizontal‐bar chart PER test case
-all_tcs = sorted(grouped["Test Case"].unique(), key=lambda s: int(s.split()[-1]))
 
-plt.rcParams.update({'figure.autolayout': True})  # ensure tight layout
+# ─────────────────────────────────────────────────────────────────────────────
+# 2) READ & PREPROCESS THE BENCHMARK.CSV
+# ─────────────────────────────────────────────────────────────────────────────
+#    Columns of build/benchmark.csv:
+#      Function, Test Case, Iteration, Cycles
+#
+bench_df = pd.read_csv("build/benchmark.csv")
+bench_df["Test Case"] = "TC " + bench_df["Test Case"].astype(str) 
+
+# Compute mean cycles per (Function, Test Case) for benchmark data:
+bench_grouped = (
+    bench_df
+    .groupby(["Function", "Test Case"])[["Cycles"]]
+    .mean()
+    .reset_index()
+)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 3) READ & PREPROCESS THE ORIGINAL.CSV
+# ─────────────────────────────────────────────────────────────────────────────
+#    original.csv has no header, but each line is:
+#      Original, <Test Case>, <Iteration>, <Cycles>
+#    Example:
+#      Original,0,0,246679
+#      Original,0,1,181633
+#      Original,0,2,176453
+#
+orig_df = pd.read_csv(
+    "build/original.csv",
+    header=None,
+    names=["Function", "Test Case", "Iteration", "Cycles"]
+)
+# All rows in this file have Function == "Original"
+orig_df["Test Case"] = "TC " + orig_df["Test Case"].astype(str)
+
+# Compute mean cycles per (Function="Original", Test Case) for original data:
+orig_grouped = (
+    orig_df
+    .groupby(["Function", "Test Case"])[["Cycles"]]
+    .mean()
+    .reset_index()
+)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 4) CONCATENATE BENCHMARK + ORIGINAL GROUPS
+# ─────────────────────────────────────────────────────────────────────────────
+#    Now we have two DataFrames with columns ["Function","Test Case","Cycles"].
+#    We'll stack them so every plot includes "Original" alongside the other functions.
+#
+grouped_all = pd.concat([bench_grouped, orig_grouped], ignore_index=True)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 5) BUILD A CONSISTENT COLOR MAP FOR ALL FUNCTIONS (INCLUDING "Original")
+# ─────────────────────────────────────────────────────────────────────────────
+all_funcs = sorted(grouped_all["Function"].unique())
+num_funcs = len(all_funcs)
+
+# Choose a categorical colormap. Here we pick "tab10" (10 distinct colors). 
+# If you have >10 functions, it will cycle through.
+cmap = plt.get_cmap("tab10")
+
+func_to_color = {
+    func: cmap(i % cmap.N)
+    for i, func in enumerate(all_funcs)
+}
+
+# (Optional) Print to verify:
+# for func, color in func_to_color.items():
+#     print(func, "→", color)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 6) DEFINE AN X‐AXIS FORMATTER TO SHOW THOUSANDS AS “k”
+# ─────────────────────────────────────────────────────────────────────────────
+def thousands_formatter(x, pos):
+    """
+    Convert a raw number (e.g. 50000) into a string like "50 k" or "75.4 k".
+    This will be used by FuncFormatter.
+    """
+    val = x / 1000.0
+    if val.is_integer():
+        return f"{int(val)} k"
+    else:
+        return f"{val:.1f} k"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 7) PLOT ONE HORIZONTAL‐BAR CHART PER TEST CASE
+# ─────────────────────────────────────────────────────────────────────────────
+#    This loop generates:
+#      plots/benchmark_TC_0_horizontal.png
+#      plots/benchmark_TC_1_horizontal.png
+#      ...
+#      plots/benchmark_TC_4_horizontal.png
+#
+#  a) Find all unique test‐cases, sorted by their numeric suffix (0,1,2,3,4).
+all_tcs = sorted(grouped_all["Test Case"].unique(), key=lambda s: int(s.split()[-1]))
+
+plt.rcParams.update({'figure.autolayout': True})  # auto‐tight layout
 
 for tc in all_tcs:
-    subset = grouped[grouped["Test Case"] == tc].copy()
+    # b) Filter to exactly this test case
+    subset = grouped_all[grouped_all["Test Case"] == tc].copy()
+    # c) Sort by descending cycles (slowest first)
     subset_sorted = subset.sort_values("Cycles", ascending=False).reset_index(drop=True)
 
     functions = subset_sorted["Function"].tolist()
     cycles_vals = subset_sorted["Cycles"].tolist()
     y_pos = np.arange(len(functions))
 
-    fig, ax = plt.subplots(figsize=(6, len(functions)*0.4 + 1))
-    ax.barh(y_pos, cycles_vals, color="C0", edgecolor="black")
-    for i, val in enumerate(cycles_vals):
-        ax.text(val * 1.005, i, f"{int(round(val,0))}", va="center", ha="left", fontsize=9)
+    # d) Make a wider figure so labels never clip
+    fig_width = 8
+    fig_height = len(functions) * 0.4 + 1
+    fig, ax = plt.subplots(figsize=(fig_width, fig_height))
 
+    # e) Draw one horizontal bar per function, using its assigned color
+    for i, func in enumerate(functions):
+        ax.barh(
+            y_pos[i],
+            cycles_vals[i],
+            color=func_to_color[func],
+            edgecolor="black"
+        )
+
+    # f) Expand the x‐limit to leave room for the right‐hand annotations
+    max_cycles = max(cycles_vals)
+    ax.set_xlim(0, max_cycles * 1.15)
+
+    # g) Annotate each bar with the integer cycle count
+    for i, val in enumerate(cycles_vals):
+        ax.text(
+            val * 1.005,         # slightly to the right of the bar
+            i,
+            f"{int(round(val, 0))}",
+            va="center",
+            ha="left",
+            fontsize=9
+        )
+
+    # h) Flip y‐axis so the slowest bar is at the top
     ax.set_yticks(y_pos)
     ax.set_yticklabels(functions, fontsize=9)
     ax.invert_yaxis()
 
+    # i) Format the x‐axis in “k” with only ~5 ticks
+    ax.xaxis.set_major_formatter(ticker.FuncFormatter(thousands_formatter))
+    ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=5, integer=True))
+
+    # j) Titles, labels, grid
     ax.set_xlabel("Average Cycles", fontsize=10)
     ax.set_title(f"Average Cycles — {tc}", fontsize=12)
     ax.xaxis.grid(which="major", linestyle="--", linewidth=0.5, alpha=0.7)
 
+    # k) Save and close
     outfile = f"plots/benchmark_{tc.replace(' ', '_')}_horizontal.png"
     plt.tight_layout()
     plt.savefig(outfile, dpi=150)
     plt.close(fig)
 
-# 2) (Optional) Plot “Average Across All Test Cases” as before
-avg_all = grouped.groupby("Function")[["Cycles"]].mean().reset_index()
+# ─────────────────────────────────────────────────────────────────────────────
+# 8) PLOT “AVERAGE ACROSS ALL TEST CASES” (INCLUDING “Original”)
+# ─────────────────────────────────────────────────────────────────────────────
+#    This generates: plots/benchmark_avg_all_cases_horizontal.png
+#
+avg_all = grouped_all.groupby("Function")[["Cycles"]].mean().reset_index()
 avg_all_sorted = avg_all.sort_values("Cycles", ascending=False).reset_index(drop=True)
 
-fig, ax = plt.subplots(figsize=(6, len(avg_all_sorted)*0.4 + 1))
-y_pos = np.arange(len(avg_all_sorted))
-ax.barh(y_pos, avg_all_sorted["Cycles"], color="C1", edgecolor="black")
-for i, val in enumerate(avg_all_sorted["Cycles"]):
-    ax.text(val * 1.005, i, f"{int(round(val,0))}", va="center", ha="left", fontsize=9)
+functions = avg_all_sorted["Function"].tolist()
+cycles_vals = avg_all_sorted["Cycles"].tolist()
+y_pos = np.arange(len(functions))
+
+fig_width = 8
+fig_height = len(functions) * 0.4 + 1
+fig, ax = plt.subplots(figsize=(fig_width, fig_height))
+
+for i, func in enumerate(functions):
+    ax.barh(
+        y_pos[i],
+        cycles_vals[i],
+        color=func_to_color[func],
+        edgecolor="black"
+    )
+
+max_cycles = max(cycles_vals)
+ax.set_xlim(0, max_cycles * 1.15)
+
+for i, val in enumerate(cycles_vals):
+    ax.text(
+        val * 1.005,
+        i,
+        f"{int(round(val, 0))}",
+        va="center",
+        ha="left",
+        fontsize=9
+    )
 
 ax.set_yticks(y_pos)
-ax.set_yticklabels(avg_all_sorted["Function"], fontsize=9)
+ax.set_yticklabels(functions, fontsize=9)
 ax.invert_yaxis()
+
+ax.xaxis.set_major_formatter(ticker.FuncFormatter(thousands_formatter))
+ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=5, integer=True))
+
 ax.set_xlabel("Average Cycles (averaged across all test cases)", fontsize=10)
 ax.set_title("Function — Mean Cycles Across All Test Cases", fontsize=12)
+ax.xaxis.grid(which="major", linestyle="--", linewidth=0.5, alpha=0.7)
+
+plt.tight_layout()
+plt.savefig("plots/benchmark_avg_all_cases_horizontal.png", dpi=150)
+plt.close(fig)
 ax.xaxis.grid(which="major", linestyle="--", linewidth=0.5, alpha=0.7)
 
 plt.tight_layout()
