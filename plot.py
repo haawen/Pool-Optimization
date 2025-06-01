@@ -450,6 +450,7 @@ for op in ["ADDS", "MULS", "DIVS", "SQRT"]:
 #  (2) COST PER FUNCTION — Horizontal Bars, Thicker
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 op_colors = {
     "ADDS": "green",
     "MULS": "blue",
@@ -465,110 +466,222 @@ def thousands_formatter(x, pos):
         return f"{val:.1f} k"
 
 for func, data in flops.groupby("Function"):
+    # 1) Compute average ADDS/MULS/DIVS/SQRT per Section for this function
     groups = (
         data.groupby("Section")[["ADDS", "MULS", "DIVS", "SQRT"]]
             .mean()
             .reset_index()
     )
-    sections   = groups["Section"].tolist()      # e.g. ["Initialization","Impulse",…]
-    operations = ["ADDS", "MULS", "DIVS", "SQRT"]
-    N_secs     = len(sections)
-    N_ops      = len(operations)
+    # Separate out the “collide_balls” row (to call it “Total”)
+    total_row = groups[groups["Section"] == "collide_balls"].copy()
+    sections_except_cb = groups[groups["Section"] != "collide_balls"].copy()
 
-    # 1) Thicken cluster and add big gap between sections
-    cluster_height = 1.0           # each section’s cluster is 1" tall
-    bar_height     = cluster_height / N_ops
-    gap_between    = 0.5           # <- full 1" gap between adjacent sections
+    # Rename “collide_balls” → “Total” in that one‐row DataFrame
+    if not total_row.empty:
+        total_row.loc[:, "Section"] = "Total"
 
-    cluster_spacing = cluster_height + gap_between
-    y_centers = np.arange(N_secs) * cluster_spacing
+    # --------------------------------------------------------------------------------
+    # A) PLOT 1: All sections except “collide_balls”
+    # --------------------------------------------------------------------------------
+    if not sections_except_cb.empty:
+        sections = sections_except_cb["Section"].tolist()
+        operations = ["ADDS", "MULS", "DIVS", "SQRT"]
+        N_secs = len(sections)
+        N_ops = len(operations)
 
-    # 2) Compute figure height: last cluster center + half cluster_height + margin
-    fig_width  = 8
-    fig_height = N_secs * cluster_spacing + 0.5
-    fig, ax    = plt.subplots(figsize=(fig_width, fig_height))
+        # Thicken cluster + a small gap between section clusters
+        cluster_height = 1.0
+        bar_height = cluster_height / N_ops
+        gap_between = 0.5  # inches of whitespace between clusters
 
-    # 3) Draw bars for each operation within a section cluster
-    for op_idx, op in enumerate(operations):
-        vals = groups[op].values  # length = N_secs
-        y_positions = (
-            y_centers
-            + op_idx * bar_height
-            - (cluster_height / 2)
-            + (bar_height / 2)
-        )
-        ax.barh(
-            y_positions,
-            vals,
-            height=bar_height * 0.9,  # 10% vertical gap between sub-bars
-            color=op_colors.get(op, "gray"),
-            edgecolor="black",
-            label=op
-        )
+        cluster_spacing = cluster_height + gap_between
+        y_centers = np.arange(N_secs) * cluster_spacing
 
-    # 4) Dashed dividers between section clusters
-    for i in range(N_secs - 1):
-        divider_y = y_centers[i] + (cluster_height / 2) + (gap_between / 2)
-        ax.axhline(divider_y, color="gray", linestyle="--", linewidth=0.5, alpha=0.5)
+        # Compute figure height (plus a small margin)
+        fig_width = 8
+        fig_height = N_secs * cluster_spacing + 0.5
+        fig, ax = plt.subplots(figsize=(fig_width, fig_height))
 
-    # 5) Expand x-limit so "0" labels fit
-    max_count = groups[operations].values.max()
-    ax.set_xlim(0, max_count * 1.15)
-
-    # 6) Annotate every bar (even zeros)
-    for sec_idx, sec in enumerate(sections):
+        # Draw bars for each operation within each section cluster
         for op_idx, op in enumerate(operations):
-            val = groups.loc[sec_idx, op]
-            if val > 0:
-                x_pos = val * 1.005
-            else:
-                x_pos = max_count * 0.005
-            y_pos = (
-                y_centers[sec_idx]
+            vals = sections_except_cb[op].values  # length = N_secs
+            y_positions = (
+                y_centers
                 + op_idx * bar_height
                 - (cluster_height / 2)
                 + (bar_height / 2)
             )
-            ax.text(
-                x_pos,
-                y_pos,
-                f"{int(round(val, 0))}",
-                va="center",
-                ha="left",
-                fontsize=9,
-                color="black"
+            ax.barh(
+                y_positions,
+                vals,
+                height=bar_height * 0.9,  # small 10% gap between sub-bars
+                color=op_colors.get(op, "gray"),
+                edgecolor="black",
+                label=op,
             )
 
-    # 7) Flip y-axis, label sections
-    ax.set_yticks(y_centers)
-    ax.set_yticklabels(sections, fontsize=10)
+        # Draw dashed dividers between section clusters
+        for i in range(N_secs - 1):
+            divider_y = (
+                y_centers[i] + (cluster_height / 2) + (gap_between / 2)
+            )
+            ax.axhline(
+                divider_y, color="gray", linestyle="--", linewidth=0.5, alpha=0.5
+            )
+
+        # Expand x‐limit so “0” labels fit
+        max_count = sections_except_cb[operations].values.max()
+        ax.set_xlim(0, max_count * 1.15)
+
+        # Annotate every bar (including zeros)
+        for sec_idx, sec in enumerate(sections):
+            for op_idx, op in enumerate(operations):
+                val = float(sections_except_cb.loc[sec_idx, op])
+                if val > 0:
+                    x_pos = val * 1.005
+                else:
+                    x_pos = max_count * 0.005
+                y_pos = (
+                    y_centers[sec_idx]
+                    + op_idx * bar_height
+                    - (cluster_height / 2)
+                    + (bar_height / 2)
+                )
+                ax.text(
+                    x_pos,
+                    y_pos,
+                    f"{int(round(val, 0))}",
+                    va="center",
+                    ha="left",
+                    fontsize=9,
+                    color="black",
+                )
+
+        # Flip y-axis, label sections (e.g. “Initialization”, “Impulse”…)
+        ax.set_yticks(y_centers)
+        ax.set_yticklabels(sections, fontsize=10)
+        ax.invert_yaxis()
+
+        # Format x-axis in “k”
+        ax.xaxis.set_major_formatter(
+            ticker.FuncFormatter(thousands_formatter)
+        )
+        ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=5, integer=True))
+
+        # Titles, legend, grid
+        ax.set_xlabel("Operation Count", fontsize=12)
+        ax.set_title(f"Cost Evaluation for {func}", fontsize=14)
+        ax.xaxis.grid(
+            which="major", linestyle="--", linewidth=0.5, alpha=0.7
+        )
+
+        ax.legend(
+            title="Operation",
+            bbox_to_anchor=(1.02, 1),
+            loc="upper left",
+            fontsize=10,
+            title_fontsize=12,
+            frameon=False,
+        )
+
+        # Save figure (excluding “collide_balls”)
+        safe_name = func.replace(" ", "_")
+        outfile = f"plots/Cost_{safe_name}_sections_horizontal.png"
+        plt.tight_layout()
+        plt.savefig(outfile, dpi=150)
+        plt.close(fig)
+
+    # --------------------------------------------------------------------------------
+    # B) PLOT 2: The “Total” (formerly “collide_balls”) as its own plot
+    # --------------------------------------------------------------------------------
+    # Assume `total_row` is a one‐row DataFrame where:
+    #   total_row["Section"] == "collide_balls"
+    # and you’ve already renamed that row’s section to "Total".
+    # Also assume `operations = ["ADDS", "MULS", "DIVS", "SQRT"]` and `op_colors` exist.
+
+    operations = ["ADDS", "MULS", "DIVS", "SQRT"]
+
+    # 1) We only have one “section” cluster (Total), so cluster_center is at y=0.
+    y_center = 0.0
+
+    # 2) Thicken the group: increase cluster_height, leaving plenty of space between bars.
+    cluster_height = 1.6          # each operation‐bar cluster is now 1.6" tall
+    bar_height     = cluster_height / len(operations)  # = 0.4" per bar
+
+    # 3) Compute figure size: height = cluster_height + small margin
+    fig_width  = 8
+    fig_height = cluster_height + 0.5  # add 0.5" of top/bottom padding
+    fig, ax    = plt.subplots(figsize=(fig_width, fig_height))
+
+    # 4) Draw one horizontal bar per operation, vertically offset so they do not overlap
+    for op_idx, op in enumerate(operations):
+        val = float(total_row.iloc[0][op])  # the single value for this op
+
+        # Compute y-position for this bar:
+        y_pos = (
+            y_center
+            + op_idx * bar_height
+            - (cluster_height / 2)
+            + (bar_height / 2)
+        )
+
+        ax.barh(
+            y_pos,
+            val,
+            height=bar_height * 0.9,  # 90% of bar_height gives a small gap between bars
+            color=op_colors.get(op, "gray"),
+            edgecolor="black",
+        )
+
+        # Annotate the bar with its integer value (right‐aligned)
+        if val > 0:
+            x_pos = val * 1.005
+        else:
+            x_pos = 0  # or a small epsilon if you want to show "0"
+
+        ax.text(
+            x_pos,
+            y_pos,
+            f"{int(round(val, 0))}",
+            va="center",
+            ha="left",
+            fontsize=10,
+            color="black",
+        )
+
+    # 5) Label the y-axis with the operation names (vertical positions align with bars)
+    y_ticks = [
+        y_center + op_idx * bar_height - (cluster_height / 2) + (bar_height / 2)
+        for op_idx in range(len(operations))
+    ]
+    ax.set_yticks(y_ticks)
+    ax.set_yticklabels(operations, fontsize=11)
+
+    # Invert y so that ADDS appears at the top (or reverse order if you prefer)
     ax.invert_yaxis()
 
-    # 8) Format x-axis in "k"
+    # 6) Expand x‐limit so annotations never run off
+    max_val = float(total_row[operations].values.max())
+    ax.set_xlim(0, max_val * 1.15)
+
+    # 7) Remove the legend entirely:
+    #    (We never passed a 'label' to barh, so no legend is drawn by default.)
+
+    # 8) Format x-axis in “k”
     ax.xaxis.set_major_formatter(ticker.FuncFormatter(thousands_formatter))
     ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=5, integer=True))
 
-    # 9) Labels, title, grid, legend
+    # 9) Titles, labels, grid
     ax.set_xlabel("Operation Count", fontsize=12)
-    ax.set_title(f"Cost Evaluation for {func}", fontsize=14)
+    ax.set_title(f"Total Cost for {func}", fontsize=14)
     ax.xaxis.grid(which="major", linestyle="--", linewidth=0.5, alpha=0.7)
 
-    ax.legend(
-        title="Operation",
-        bbox_to_anchor=(1.02, 1),
-        loc="upper left",
-        fontsize=10,
-        title_fontsize=12,
-        frameon=False
-    )
-
-    # 10) Save figure
+    # 10) Save and close
     safe_name = func.replace(" ", "_")
-    outfile = f"plots/Cost_{safe_name}_horizontal.png"
+    outfile = f"plots/Cost_{safe_name}_Total_horizontal.png"
     plt.tight_layout()
     plt.savefig(outfile, dpi=150)
     plt.close(fig)
-
 
 # 1) Read in flops.csv and profiling.csv, convert both "Test Case" to "TC X"
 # -----------------------------------------------------------------------------
