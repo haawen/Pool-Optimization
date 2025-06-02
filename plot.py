@@ -81,8 +81,8 @@ bench_grouped = (
 #
 orig_df = pd.read_csv(
     "build/original.csv",
-    header=None,
-    names=["Function", "Test Case", "Iteration", "Cycles"]
+    # header=None,
+    # names=["Function", "Test Case", "Iteration", "Cycles"]
 )
 # All rows in this file have Function == "Original"
 orig_df["Test Case"] = "TC " + orig_df["Test Case"].astype(str)
@@ -850,24 +850,30 @@ plt.tight_layout()
 plt.savefig("plots/flops_per_cycle_avg_all_cases.png", dpi=150)
 plt.close(fig)
 
-"""
+
 
 # TODO: calcualte peak performance based on COST values and operations / ports, then plot
 # TODO: Add port info per instruction
 
+# ────────────────────────────────────────────────────────────────────
+#  Roofline plot for a predefined set of functions
+# ────────────────────────────────────────────────────────────────────
+
+selected_funcs = ["Approx + Symmetry"] # Recip sqrt
+
 roofline = {
-    "AMD Ryzen 7 7735U": {
+    "AMD Ryzen 5 5600X": {
         "No SIMD": {
-            "pi": 32,  # This is with cores included, but per core would be / 16?
-            "beta": 28.4,
+            "pi": 4,            # 4 FP ports (scalar)
+            "beta": 28 / 3.7,   # achievable bandwidth (FLOP/Byte)
             "ADDS": 0.5,
             "MULS": 0.5,
             "DIVS": 3.5,
             "SQRT": 5.0,
         },
         "SIMD": {
-            "pi": 128,
-            "beta": 28.4,
+            "pi": 4 * 4,        # 4 FP ports × 4‐wide SIMD = 16
+            "beta": 28 / 3.7,
             "ADDS": 0.125,
             "MULS": 0.125,
             "DIVS": 0.875,
@@ -876,28 +882,131 @@ roofline = {
     }
 }
 
+flops_mean = (
+    flops_df
+    .groupby(["Function", "Test Case"])[["Flops"]]
+    .mean()
+    .reset_index()
+)
+
+cycles_mean = (
+    prof_df
+    .groupby(["Function", "Test Case"])[["Cycles"]]
+    .mean()
+    .reset_index()
+)
+
+fp = pd.merge(
+    flops_mean,
+    cycles_mean,
+    on=["Function", "Test Case"]
+)
+
+# (d) Compute FlopsPerCycle and OI = Flops / 144
+fp["FlopsPerCycle"] = fp["Flops"] / fp["Cycles"]
+fp["OI"]            = fp["Flops"] / 144.0
+
+tc0_fp = fp[
+    (fp["Test Case"] == "TC 0") &
+    (fp["Function"].isin(selected_funcs))
+]
+
+missing = set(selected_funcs) - set(tc0_fp["Function"].unique())
+if missing:
+    raise RuntimeError(
+        f"The following functions were not found for TC 0: {missing}\n"
+        f"Available (Function, Test Case) pairs:\n"
+        f"{fp[['Function','Test Case']].drop_duplicates().to_string(index=False)}"
+    )
+
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
+
 oi = np.logspace(-2, 2, 1000)
 
-# Plot setup
 plt.figure(figsize=(10, 6))
 
-# Plot each roofline
-for cpu, configs in roofline.items():
+for cpu_name, configs in roofline.items():
     for label, vals in configs.items():
-        pi = vals["pi"]
+        pi   = vals["pi"]
         beta = vals["beta"]
-        y = np.minimum(beta * oi, pi)
-        plt.plot(oi, y, label=f"{cpu} - {label}")
+        y    = np.minimum(beta * oi, pi)
+        plt.plot(oi, y, label=f"{cpu_name} – {label}")
 
-# Axis and styling
+ax = plt.gca()
+
+cpu_name = list(roofline.keys())[0]
+no_simd  = roofline[cpu_name]["No SIMD"]
+simd     = roofline[cpu_name]["SIMD"]
+info_text = (
+    f"Processor: {cpu_name}\n"
+    f"  No SIMD -> pi = {no_simd['pi']} FLOP/Cycle,  beta = {no_simd['beta']:.2f} FLOP/Byte\n"
+    f"  SIMD    -> pi = {simd['pi']} FLOP/Cycle,  beta = {simd['beta']:.2f} FLOP/Byte"
+)
+ax.text(
+    0.5, 1.05, info_text,
+    transform=ax.transAxes,
+    ha="center",
+    va="bottom",
+    fontsize=10
+)
+
+for _, row in tc0_fp.iterrows():
+    func        = row["Function"]
+    measured_oi = row["OI"]
+    measured_perf = row["FlopsPerCycle"]
+
+    plt.scatter(
+        measured_oi,
+        measured_perf,
+        color="black",
+        marker="X",
+        s=70,
+        label=f"TC 0 ({func})"
+    )
+    plt.annotate(
+        f"{func}\n(OI={measured_oi:.3f}, Perf={measured_perf:.2f})",
+        xy=(measured_oi, measured_perf),
+        xytext=(measured_oi * 1.2, measured_perf * 0.8),
+        arrowprops=dict(arrowstyle="->", lw=1, color="black"),
+        fontsize=9
+    )
+
 plt.xscale("log")
 plt.yscale("log")
-plt.xlabel("Operational Intensity (FLOPs/Byte)")
-plt.ylabel("Performance (FLOPs/Cycle)")
-plt.title("Roofline Model")
+plt.xlabel("Operational Intensity (FLOPs/Byte)", fontsize=12)
+plt.ylabel("Performance (FLOPs/Cycle)", fontsize=12)
+plt.title("Roofline Model (TC 0 for Selected Functions)", fontsize=14)
 plt.grid(True, which="both", linestyle="--", linewidth=0.5)
-plt.legend()
+plt.legend(loc="upper left", fontsize=9)
+
 plt.tight_layout()
-plt.savefig("plots/roofline.png")
+plt.savefig("plots/roofline_selected_TC0.png", dpi=150)
 plt.close()
-"""
+
+# oi = np.logspace(-2, 2, 1000)
+
+# # Plot setup
+# plt.figure(figsize=(10, 6))
+
+# # Plot each roofline
+# for cpu, configs in roofline.items():
+#     for label, vals in configs.items():
+#         pi = vals["pi"]
+#         beta = vals["beta"]
+#         y = np.minimum(beta * oi, pi)
+#         plt.plot(oi, y, label=f"{cpu} - {label}")
+
+# # Axis and styling
+# plt.xscale("log")
+# plt.yscale("log")
+# plt.xlabel("Operational Intensity (FLOPs/Byte)")
+# plt.ylabel("Performance (FLOPs/Cycle)")
+# plt.title("Roofline Model")
+# plt.grid(True, which="both", linestyle="--", linewidth=0.5)
+# plt.legend()
+# plt.tight_layout()
+# plt.savefig("plots/roofline.png")
+# plt.close()
+

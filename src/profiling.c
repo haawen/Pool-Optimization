@@ -305,15 +305,18 @@ void test_approx_sqrt(void)
 {
     call_function("scalar Less SQRT + Approx", approxsq_collide_balls);
 }
-void test_recip_sqrt(void) {
-    call_function("Reciprocal Sqrt", recip_sqrt);
+void test_recip_sqrt(void)
+{
+    call_function("Approx + Symmetry", recip_sqrt);
 }
 
-void test_recip_sqrt_hoist(void) {
+void test_recip_sqrt_hoist(void)
+{
     call_function("Reciprocal Sqrt Hoist", recip_sqrt_hoist);
 }
 
-void test_recip_sqrt_ifs(void) {
+void test_recip_sqrt_ifs(void)
+{
     call_function("Reciprocal Sqrt IF", recip_sqrt_better_ifs);
 }
 
@@ -344,9 +347,9 @@ void test_improved_symmetry(void)
     call_function("Improved Symmetry", improved_symmetry_collide_balls);
 }
 
-void test_simd_ssd(void)
+void test_simd_ssa(void)
 {
-     call_function("SIMD SSD", simd_ssa);
+    call_function("SIMD SSA", simd_ssa);
 }
 
 int main()
@@ -373,20 +376,20 @@ int main()
 
     void (*tests[])(void) = {
         test_collide_balls_basic,
-        //test_scalar_sqrt,
-        //test_approx_sqrt,
-    //    test_recip_sqrt,
-      //  test_collide_balls_simd,
+        test_scalar_sqrt,
+        test_approx_sqrt,
+        test_recip_sqrt,
+        test_collide_balls_simd,
         test_collide_balls_code_motion,
-        //test_simd_collide_ball_2,
-       // test_improved_symmetry,
-        //test_collide_balls_simd2,
-        //test_collide_balls_simd3,
-      //  test_register_relieve,
-      //  test_recip_sqrt_ifs,
-       // test_recip_sqrt_less_ifs,
-       // test_simd_ssd,
-        //test_recip_sqrt_hoist,
+        test_simd_collide_ball_2,
+        test_improved_symmetry,
+        test_collide_balls_simd2,
+        test_collide_balls_simd3,
+        test_register_relieve,
+        test_recip_sqrt_ifs,
+        test_recip_sqrt_less_ifs,
+        test_simd_ssa,
+        test_recip_sqrt_hoist,
     };
 
     const char *function_names[] = {
@@ -404,7 +407,7 @@ int main()
         "Reciprocal Sqrt IF",
         "Reciprocal Sqrt Less IF",
         "Reciprocal Sqrt Hoist",
-        "SIMD SSD",
+        "SIMD SSA",
     };
 
 #define NUM_FUNCTIONS (sizeof(tests) / sizeof(tests[0]))
