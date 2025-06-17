@@ -16,4 +16,4 @@ toolchain.cmake
 venv/
 src/pool copy.c
 
-__pycache__
+__pycache__/

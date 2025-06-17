@@ -460,7 +460,7 @@ if __name__ == "__main__":
 
     import ctypes
 
-    lib = ctypes.CDLL("./build/libpool_shared.so")
+    lib = ctypes.CDLL("./build/libpool_shared.dll")
     lib.python_start_tsc.argtypes = []
     lib.python_start_tsc.restype = ctypes.c_uint64
 

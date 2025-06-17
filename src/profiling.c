@@ -7,11 +7,7 @@
 #endif
 #include "unity.h"
 #include "pool.h"
-
-#define WARMUP 100
-#define ITERATIONS 10000
-#define TEST_RUNNER_ITERATIONS 3      // Rerun all TestCases (so warmup + iterations) in Random Order
-#define FLUSH_SIZE (32 * 1024 * 1024) // 32MB buffer
+#include "profiling.h"
 
 #ifdef PROFILE
 const char *file_name = "profiling.csv";
@@ -19,29 +15,6 @@ const char *file_name = "profiling.csv";
 const char *file_name = "benchmark.csv";
 #endif
 
-typedef struct
-{
-    float R;    // Ball radius
-    float M;    // Ball mass
-    float u_s1; // Coefficient of sliding friction (ball 1)
-    float u_s2; // Coefficient of sliding friction (ball 2)
-    float u_b;  // Coefficient of ball-ball friction
-    float e_b;  // Coefficient of restitution
-    int N;      // Number of iterations (deltaP is None, so we skip it)
-
-    // Initial rvw (position, velocity, angular velocity)
-    double rvw1[9];
-    double rvw2[9];
-
-    struct
-    {
-        double velocity[3];
-        double angular[3];
-    } ball1, ball2;
-} CollisionData;
-
-#define TEST_CASES 5
-double tolerance = 1e-6;
 CollisionData reference[TEST_CASES];
 
 void setUp(void)
@@ -128,8 +101,6 @@ void setUp(void)
         .ball2 = {.velocity = {1.3428287942353496, 1.5337707065147121, 0.0}, .angular = {-20.163274160647937, 74.68250107163708, -2.0380303552667263}}};
 }
 void tearDown(void) {}
-
-typedef void (*CollideBallsFn)(double *, double *, float, float, float, float, float, float, float, int, double *, double *, Profile *, Branch *);
 
 void summarize_profile(Profile *profile, const char *func_name, const char *part_name, int test_case, int iteration, FILE *file)
 {

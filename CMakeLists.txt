@@ -23,7 +23,7 @@ set(FLAGS
     -mavx2
     -Ofast
     # #-march=native # unpredictable, most of the times worsens
-    # -Wall
+    -Wall
     # -pedantic
     -fno-math-errno
     -funroll-loops
@@ -45,7 +45,6 @@ target_compile_definitions(profiling PRIVATE UNITY_INCLUDE_DOUBLE)
 
 add_executable(benchmark src/profiling.c ${SOURCES} ${UNITY_DIR}/unity.c)
 target_compile_options(benchmark PRIVATE ${FLAGS} -g)
-
 target_compile_definitions(benchmark PRIVATE UNITY_INCLUDE_DOUBLE)
 
 add_executable(single_performance src/single_performance.c ${SOURCES} )
@@ -67,6 +66,14 @@ add_custom_target(collide_balls_asm
           -o ${CMAKE_BINARY_DIR}/pool.s
           ${CMAKE_SOURCE_DIR}/src/pool.c
 )
+
+# SPMD compilations
+add_executable(spmd_benchmark src/profiling_spmd.c ${SOURCES} src/pool_spmd.c ${UNITY_DIR}/unity.c)
+target_compile_options(spmd_benchmark PRIVATE ${FLAGS} -g)
+target_compile_definitions(spmd_benchmark PRIVATE UNITY_INCLUDE_DOUBLE)
+
+add_executable(spmd_single_performance src/single_performance_spmd.c ${SOURCES} src/pool_spmd.c)
+target_compile_options(spmd_single_performance PRIVATE ${FLAGS} -g)
 
 if(UNIX)
     target_link_libraries(pool_shared m)

@@ -15,46 +15,6 @@
 #include <x86intrin.h>
 #endif
 
-#ifndef likely
-#define likely(x) __builtin_expect(!!(x), 1)
-#define unlikely(x) __builtin_expect(!!(x), 0)
-#endif
-
-#ifdef FLOP_COUNT
-
-#define FLOPS(adds, muls, divs, sqrt, ...)                             \
-    do                                                                 \
-    {                                                                  \
-        void *arr[] = {__VA_ARGS__};                                   \
-        for (size_t i = 0; i < sizeof(arr) / sizeof(void *); i++)      \
-        {                                                              \
-            ((Profile *)arr[i])->flops += (adds + muls + divs + sqrt); \
-            ((Profile *)arr[i])->ADDS += (adds);                       \
-            ((Profile *)arr[i])->MULS += (muls);                       \
-            ((Profile *)arr[i])->DIVS += (divs);                       \
-            ((Profile *)arr[i])->SQRT += (sqrt);                       \
-        }                                                              \
-    } while (0)
-
-#define MEMORY(count, ...)                                        \
-    do                                                            \
-    {                                                             \
-        void *arr[] = {__VA_ARGS__};                              \
-        for (size_t i = 0; i < sizeof(arr) / sizeof(void *); i++) \
-        {                                                         \
-            ((Profile *)arr[i])->memory += (count);               \
-        }                                                         \
-    } while (0)
-
-#define BRANCH(i) branches[i].count++
-
-#else
-
-#define FLOPS(adds, muls, divs, sqrt, ...)
-#define MEMORY(count, ...)
-#define BRANCH(i)
-#endif
-
 typedef __m256d v3d; /* 4 doubles, but we use only 3 */
 
 #define V3D_SET(x, y, z) _mm256_set_pd(0.0, (z), (y), (x))
@@ -1381,7 +1341,7 @@ DLL_EXPORT void recip_sqrt(double *restrict rvw1, double *restrict rvw2, float R
             // --- fast approx reciprocal sqrt of cbm2 ---
             // 1) approximate via double-precision Newton step on float rsqrt
             FLOPS(1, 4, 0, 1, complete_function, impulse);
-            float f = (float)cbm2;
+            // float f = (float)cbm2;
             float r = _mm_cvtss_f32(
                 _mm_rsqrt_ss(
                     _mm_set_ss((float)cbm2)));
@@ -1420,7 +1380,7 @@ DLL_EXPORT void recip_sqrt(double *restrict rvw1, double *restrict rvw2, float R
                         FLOPS(3, 12, 0, 1, complete_function, impulse);
                         double sv2sq = fma(surface_velocity_x_2, surface_velocity_x_2, surface_velocity_y_2 * surface_velocity_y_2);
                         // fast rsqrt(sv2sq):
-                        float fs = (float)sv2sq;
+                        // float fs = (float)sv2sq;
                         float rs = _mm_cvtss_f32(_mm_rsqrt_ss(_mm_set_ss((float)sv2sq)));
                         double inv_sv2 = (double)rs * fma(rs * rs, -0.5 * sv2sq, 1.5);
                         deltaP_x_2 = -u_s2 * surface_velocity_x_2 * inv_sv2 * deltaP_2;
@@ -1444,7 +1404,7 @@ DLL_EXPORT void recip_sqrt(double *restrict rvw1, double *restrict rvw2, float R
                         FLOPS(1, 12, 0, 1, complete_function, impulse);
                         double sv1sq = fma(surface_velocity_x_1, surface_velocity_x_1, surface_velocity_y_1 * surface_velocity_y_1);
                         // fast rsqrt(sv1sq):
-                        float ft = (float)sv1sq;
+                        // float ft = (float)sv1sq;
                         float rt = _mm_cvtss_f32(_mm_rsqrt_ss(_mm_set_ss((float)sv1sq)));
                         double inv_sv1 = (double)rt * fma(rt * rt, -0.5 * sv1sq, 1.5);
                         deltaP_x_1 = u_s1 * surface_velocity_x_1 * inv_sv1 * deltaP_2;
@@ -6258,7 +6218,6 @@ DLL_EXPORT void simd_ssa(double *restrict rvw1, double *restrict rvw2, float R, 
     __m256d i103_comp_vec = _mm256_set1_pd(1e-16);                     // Set the contact point length comparison vector
 
     END_PROFILE(before_loop);
-    int simd_debug_iter = 0;
     /* ----------------------------- main loop ----------------------- */
     while (i87_vdiff < 0.0 || i89_total_work < i90_work_required)
     {
