@@ -158,14 +158,15 @@ int main()
 
     setUp();
 
-    call_function("Basic Implementation", collide_balls);
-    // call_function("Scalar Less SQRT", scalar_less_sqrt);
-    // call_function("scalar Less SQRT + Approx", approxsq_collide_balls);
-    call_function("Approx + Symmetry", recip_sqrt);
-    // call_function("SIMD", simd_collide_balls);
-    call_function("Code Motion", code_motion_collide_balls);
-    //  call_function("Full SIMD", simd_collide_ball_2);
-    // call_function("SIMD scalar loop", simd_scalar_loop);
+
+    call_function("Initial C", collide_balls);
+    call_function("Precompute", simple_precompute_cb);
+    call_function("RSQRT", recip_sqrt);
+    call_function("Bitwise Masks", recip_sqrt_masks);
+    call_function("SIMD Overhaul", simd_ssa);
+    call_function("RSQRT Double While", recip_sqrt_double_while);
+    call_function("FMA", collide_balls_fma);
+    call_function("SIMD", simd_collide_balls);
 
     return 0;
 }

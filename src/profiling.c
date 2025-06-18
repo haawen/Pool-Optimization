@@ -226,7 +226,7 @@ void call_function(const char *name, CollideBallsFn collide_fn)
 
 void test_collide_balls_basic(void)
 {
-    call_function("Basic Implementation", collide_balls);
+    call_function("Initial C", collide_balls);
 }
 
 void test_register_relieve(void)
@@ -278,11 +278,11 @@ void test_approx_sqrt(void)
 }
 void test_recip_sqrt(void)
 {
-    call_function("Approx + Symmetry", recip_sqrt);
+    call_function("RSQRT", recip_sqrt);
 }
 
 void test_recip_sqrt_double_while(void) {
-    call_function("Reciprocal Sqrt Double While", recip_sqrt_double_while);
+    call_function("RSQRT Double While", recip_sqrt_double_while);
 }
 
 void test_recip_sqrt_hoist(void) {
@@ -301,13 +301,14 @@ void test_recip_sqrt_less_ifs(void)
 
 void test_recip_sqrt_masks(void)
 {
-    call_function("Reciprocal Sqrt Masks", recip_sqrt_masks);
+    call_function("Bitwise Masks", recip_sqrt_masks);
 }
 
 void test_collide_balls_simd(void)
 {
     call_function("SIMD", simd_collide_balls);
 }
+
 void test_collide_balls_simd2(void)
 {
     // call_function("Full SIMD", SIMD_Full_basic);
@@ -318,7 +319,7 @@ void test_collide_balls_simd3(void)
 }
 void test_simd_collide_ball_2(void)
 {
-    call_function("SIMD Optimized Impulse", simd_collide_ball_2);
+    call_function("SIMD bad ", simd_collide_ball_2);
 }
 
 void test_improved_symmetry(void)
@@ -328,7 +329,13 @@ void test_improved_symmetry(void)
 
 void test_simd_ssa(void)
 {
-    call_function("SIMD SSA", simd_ssa);
+    call_function("SIMD Overhaul", simd_ssa);
+}
+
+void test_fma(void)
+{
+    call_function("FMA", collide_balls_fma);
+
 }
 
 int main()
@@ -354,9 +361,14 @@ int main()
     srand((unsigned int)time(NULL));
 
     void (*tests[])(void) = {
+        test_collide_balls_basic,
+        test_precomp,
         test_recip_sqrt,
-        // test_recip_sqrt_masks
-        // test_recip_sqrt_double_while
+        test_recip_sqrt_masks,
+        test_simd_ssa,
+        test_recip_sqrt_double_while,
+        test_fma,
+        test_collide_balls_simd,
     };
 
     const char *function_names[] = {
