@@ -1,29 +1,8 @@
 #include <stdio.h>
 
 #include "pool.h"
+#include "profiling.h"
 
-typedef struct
-{
-    float R;    // Ball radius
-    float M;    // Ball mass
-    float u_s1; // Coefficient of sliding friction (ball 1)
-    float u_s2; // Coefficient of sliding friction (ball 2)
-    float u_b;  // Coefficient of ball-ball friction
-    float e_b;  // Coefficient of restitution
-    int N;      // Number of iterations (deltaP is None, so we skip it)
-
-    // Initial rvw (position, velocity, angular velocity)
-    double rvw1[9];
-    double rvw2[9];
-
-    struct
-    {
-        double velocity[3];
-        double angular[3];
-    } ball1, ball2;
-} CollisionData;
-
-#define TEST_CASES 5
 CollisionData reference[TEST_CASES];
 
 void setUp(void)
@@ -109,8 +88,6 @@ void setUp(void)
         .ball1 = {.velocity = {1.1060149417261151, -0.9059349187641589, 0.0}, .angular = {-0.6741763817472055, -0.7895903199908095, -2.0380303552667263}},
         .ball2 = {.velocity = {1.3428287942353496, 1.5337707065147121, 0.0}, .angular = {-20.163274160647937, 74.68250107163708, -2.0380303552667263}}};
 }
-
-typedef void (*CollideBallsFn)(double *, double *, float, float, float, float, float, float, float, int, double *, double *, Profile *, Branch *);
 
 void call_function(const char *name, CollideBallsFn collide_fn)
 {

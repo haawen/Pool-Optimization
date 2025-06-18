@@ -75,6 +75,10 @@ target_compile_definitions(spmd_benchmark PRIVATE UNITY_INCLUDE_DOUBLE)
 add_executable(spmd_single_performance src/single_performance_spmd.c ${SOURCES} src/pool_spmd.c)
 target_compile_options(spmd_single_performance PRIVATE ${FLAGS} -g)
 
+add_executable(spmd_flops src/flops_spmd.c ${SOURCES} src/pool_spmd.c)
+target_compile_options(spmd_flops PRIVATE ${FLAGS})
+target_compile_definitions(spmd_flops PRIVATE PROFILE FLOP_COUNT)
+
 if(UNIX)
     target_link_libraries(pool_shared m)
     target_link_libraries(profiling m)

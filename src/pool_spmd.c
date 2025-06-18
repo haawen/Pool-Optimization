@@ -61,7 +61,7 @@ DLL_EXPORT void spmd_4x_linear(
 {
 #ifdef PROFILE
     Profile dummy_profile[6];
-    Profile *complete_function = dummy_profile[0];
+    Profile *complete_function = &dummy_profile[0];
 #endif
     START_PROFILE(complete_function);
     collide_balls(col1_rvw1, col1_rvw2, R, M, u_s1, u_s2, col1_u_b, e_b, deltaP, N, col1_rvw1_result, col1_rvw2_result, profiles, branches);
@@ -98,7 +98,7 @@ DLL_EXPORT void spmd_4x_recip_sqrt(
 {
 #ifdef PROFILE
     Profile dummy_profile[6];
-    Profile *complete_function = dummy_profile[0];
+    Profile *complete_function = &dummy_profile[0];
 #endif
     START_PROFILE(complete_function);
     recip_sqrt(col1_rvw1, col1_rvw2, R, M, u_s1, u_s2, col1_u_b, e_b, deltaP, N, col1_rvw1_result, col1_rvw2_result, profiles, branches);
@@ -148,7 +148,7 @@ DLL_EXPORT void spmd_basic_collide_balls(
     START_PROFILE(complete_function);
     START_PROFILE(before_loop);
     // Conversion to SPMD vectors
-    MEMORY(18 * 4, complete_function, before_loop)
+    MEMORY(18 * 4, complete_function, before_loop);
     __m256d translation_0_rvw1 = _mm256_set_pd(col1_rvw1[0], col2_rvw1[0], col3_rvw1[0], col4_rvw1[0]);
     __m256d translation_0_rvw2 = _mm256_set_pd(col1_rvw2[0], col2_rvw2[0], col3_rvw2[0], col4_rvw2[0]);
 
@@ -613,6 +613,7 @@ DLL_EXPORT void spmd_basic_collide_balls(
 
     double buf[4];
 
+    MEMORY(3 * 4, complete_function, after_loop);
     _mm256_storeu_pd(buf, world_v1_x);
     col1_rvw1_result[3] = buf[3];
     col2_rvw1_result[3] = buf[2];
@@ -629,6 +630,7 @@ DLL_EXPORT void spmd_basic_collide_balls(
     col3_rvw1_result[5] = buf[1];
     col4_rvw1_result[5] = buf[0];
 
+    MEMORY(3 * 4, complete_function, after_loop);
     _mm256_storeu_pd(buf, world_v2_x);
     col1_rvw2_result[3] = buf[3];
     col2_rvw2_result[3] = buf[2];
@@ -645,6 +647,7 @@ DLL_EXPORT void spmd_basic_collide_balls(
     col3_rvw2_result[5] = buf[1];
     col4_rvw2_result[5] = buf[0];
 
+    MEMORY(3 * 4, complete_function, after_loop);
     _mm256_storeu_pd(buf, world_w1_x);
     col1_rvw1_result[6] = buf[3];
     col2_rvw1_result[6] = buf[2];
@@ -661,6 +664,7 @@ DLL_EXPORT void spmd_basic_collide_balls(
     col3_rvw1_result[8] = buf[1];
     col4_rvw1_result[8] = buf[0];
 
+    MEMORY(3 * 4, complete_function, after_loop);
     _mm256_storeu_pd(buf, world_w2_x);
     col1_rvw2_result[6] = buf[3];
     col2_rvw2_result[6] = buf[2];

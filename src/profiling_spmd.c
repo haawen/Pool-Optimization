@@ -296,9 +296,9 @@ int main()
         return 0;
     }
 #ifdef PROFILE
-    fprintf(csv, "Function,Section,Test Case,Iteration,Cycles\n");
+    fprintf(csv, "Function,Section,Iteration,Cycles\n");
 #else
-    fprintf(csv, "Function,Test Case,Iteration,Cycles\n");
+    fprintf(csv, "Function,Iteration,Cycles\n");
 #endif
     fclose(csv);
 
