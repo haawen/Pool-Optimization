@@ -124,7 +124,12 @@ int main()
 
     setUp();
 
-    call_function(recip_sqrt);
+    // call_function(collide_balls);
+    // call_function(simple_precompute_cb);
+    // call_function(remove_unused_branches);
+    //
+    call_function(recip_sqrt_masks);
+    // call_function(recip_sqrt_double_while);
 
     return 0;
 }

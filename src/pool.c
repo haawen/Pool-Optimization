@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <stdbool.h>
+#include <sys/types.h>
 
 #ifdef _MSC_VER
 #include <intrin.h>
@@ -1234,7 +1235,294 @@ DLL_EXPORT void recip_sqrt(double *restrict rvw1, double *restrict rvw2, float R
     /* ----------------------   scalar tweaks   -------------------------- */
     /* ------------------------------------------------------------------ */
 
-    FLOPS(0, 3, 2, 0, complete_function, before_loop);
+    FLOPS(0, 3, 2, 0, complete_function);
+    double invM = 1.0 / M; /* division → multiply   */
+    double invR = 1.0 / R;
+    double C = 5.0 * invM * invR * 0.5; /* 5/(2MR) */
+
+    FLOPS(3, 0, 0, 0, complete_function);
+    double offset[3];
+    offset[0] = translation_2[0] - translation_1[0];
+    offset[1] = translation_2[1] - translation_1[1];
+    offset[2] = translation_2[2] - translation_1[2];
+
+    FLOPS(2, 3, 0, 0, complete_function);
+    double offset_mag_sqrd = fma(offset[0], offset[0], fma(offset[1], offset[1], offset[2] * offset[2]));
+
+    FLOPS(0, 0, 1, 1, complete_function);
+    double offset_inv_mag = 1.0 / sqrt(offset_mag_sqrd);
+
+    // Accuracy impact!
+    // offset_inv_mag = _mm_cvtss_f32(_mm_rsqrt_ss(_mm_set_ss((float)offset_mag_sqrd)));
+
+    FLOPS(1, 3, 0, 0, complete_function);
+    double forward[4];
+    forward[0] = offset[0] * offset_inv_mag;
+    forward[1] = offset[1] * offset_inv_mag;
+    forward[2] = offset[2] * offset_inv_mag;
+    forward[3] = -forward[0]; // right[1]
+
+    /* ---------------- velocities to local frame ----------------------- */
+    FLOPS(1, 2, 0, 0, complete_function);
+    double local_velocity_x_1 = fma(velocity_1[0], forward[1], velocity_1[1] * forward[3]);
+    FLOPS(2, 3, 0, 0, complete_function);
+    double local_velocity_y_1 = fma(velocity_1[0], forward[0], fma(velocity_1[1], forward[1], velocity_1[2] * forward[2]));
+    FLOPS(1, 2, 0, 0, complete_function);
+    double local_velocity_x_2 = fma(velocity_2[0], forward[1], velocity_2[1] * forward[3]);
+    FLOPS(2, 3, 0, 0, complete_function);
+    double local_velocity_y_2 = fma(velocity_2[0], forward[0], fma(velocity_2[1], forward[1], velocity_2[2] * forward[2]));
+
+    /* --------------- angular velocities to local frame ---------------- */
+    FLOPS(1, 2, 0, 0, complete_function);
+    double local_angular_velocity_x_1 = fma(angular_velocity_1[0], forward[1], angular_velocity_1[1] * forward[3]);
+    FLOPS(2, 3, 0, 0, complete_function);
+    double local_angular_velocity_y_1 = fma(angular_velocity_1[0], forward[0], fma(angular_velocity_1[1], forward[1], angular_velocity_1[2] * forward[2]));
+    double local_angular_velocity_z_1 = angular_velocity_1[2];
+
+    FLOPS(1, 2, 0, 0, complete_function);
+    double local_angular_velocity_x_2 = fma(angular_velocity_2[0], forward[1], angular_velocity_2[1] * forward[3]);
+    FLOPS(2, 3, 0, 0, complete_function);
+    double local_angular_velocity_y_2 = fma(angular_velocity_2[0], forward[0], fma(angular_velocity_2[1], forward[1], angular_velocity_2[2] * forward[2]));
+    double local_angular_velocity_z_2 = angular_velocity_2[2];
+
+    /* ---------------- surface‑velocity helpers (use fma) -------------- */
+    FLOPS(1, 2, 0, 0, complete_function);
+    double surface_velocity_x_1 = fma(R, local_angular_velocity_y_1, local_velocity_x_1);
+    FLOPS(2, 2, 0, 0, complete_function);
+    double surface_velocity_y_1 = fma(-R, local_angular_velocity_x_1, local_velocity_y_1);
+    FLOPS(1, 2, 0, 0, complete_function);
+    double surface_velocity_x_2 = fma(R, local_angular_velocity_y_2, local_velocity_x_2);
+    FLOPS(2, 2, 0, 0, complete_function);
+    double surface_velocity_y_2 = fma(-R, local_angular_velocity_x_2, local_velocity_y_2);
+    /*
+    double surface_velocity_mag1_sq = surface_velocity_x_1*surface_velocity_x_1
+                                    + surface_velocity_y_1*surface_velocity_y_1;
+    double surface_velocity_mag2_sq = surface_velocity_x_2*surface_velocity_x_2
+                                    + surface_velocity_y_2*surface_velocity_y_2;
+    */
+
+    /* ---------------------- contact point slip ------------------------ */
+    FLOPS(3, 1, 0, 0, complete_function);
+    double contact_point_velocity_x = fma(-R, (local_angular_velocity_z_1 + local_angular_velocity_z_2), local_velocity_x_1 - local_velocity_x_2);
+    FLOPS(1, 1, 0, 0, complete_function);
+    double contact_point_velocity_z = R * (local_angular_velocity_x_1 + local_angular_velocity_x_2);
+    FLOPS(1, 1, 1, 1, complete_function);
+    double contact_inv_mag = 1.0 / sqrt(fma(contact_point_velocity_x, contact_point_velocity_x, contact_point_velocity_z * contact_point_velocity_z));
+    FLOPS(0, 0, 1, 0, complete_function);
+    double ball_ball_contact_point_magnitude =
+        1.0 / contact_inv_mag; /* keep original scalar around for profiling */
+
+    /* --------------------------- impulse step ------------------------- */
+    FLOPS(1, 0, 0, 0, complete_function);
+    double velocity_diff_y = local_velocity_y_2 - local_velocity_y_1;
+
+    if (unlikely(deltaP == 0.0f))
+    {
+        FLOPS(1, 3, 1, 0, complete_function);
+        deltaP = 0.5 * (1.0 + e_b) * M * fabs(velocity_diff_y) / (double)N;
+    }
+
+    /* bookkeeping (unchanged) */
+    double total_work = 0.0;
+    double work_required = INFINITY;
+    double work_compression = 0.0;
+
+    double deltaP_1 = deltaP, deltaP_2 = deltaP;
+    double deltaP_x_1 = 0, deltaP_y_1 = 0, deltaP_x_2 = 0, deltaP_y_2 = 0;
+
+    END_PROFILE(before_loop);
+
+    // before the loop:
+    // …then END_PROFILE(before_loop);
+    while (velocity_diff_y < 0.0 || total_work < work_required)
+    {
+        /* -------------------- impulse calculation -------------------- */
+        START_PROFILE(impulse);
+        if (unlikely(ball_ball_contact_point_magnitude < 1e-16))
+        {
+            BRANCH(0);
+            deltaP_1 = deltaP_2 = 0.0;
+            deltaP_x_1 = deltaP_y_1 = deltaP_x_2 = deltaP_y_2 = 0.0;
+        }
+        else
+        {
+            BRANCH(1);
+            FLOPS(1, 2, 0, 0, complete_function);
+            double cbm2 = fma(contact_point_velocity_x, contact_point_velocity_x, contact_point_velocity_z * contact_point_velocity_z);
+
+            // --- fast approx reciprocal sqrt of cbm2 ---
+            // 1) approximate via double-precision Newton step on float rsqrt
+
+            FLOPS(0, 0, 1, 1, complete_function);
+            float f = (float)cbm2;
+            float r = _mm_cvtss_f32(
+                _mm_rsqrt_ss(
+                    _mm_set_ss((float)cbm2)));
+            // refine to double precision: inv = r*(1.5 - 0.5*cbm2*r*r)
+            double inv_cbm = (double)r;
+
+            FLOPS(2, 4, 0, 0, complete_function);
+            inv_cbm = inv_cbm * fma(inv_cbm * inv_cbm, -0.5 * cbm2, 1.5);
+            // ------------------------------------------------------------
+
+            FLOPS(1, 3, 0, 0, complete_function);
+            deltaP_1 = -u_b * deltaP * contact_point_velocity_x * inv_cbm;
+            if (unlikely(fabs(contact_point_velocity_z) < 1e-16))
+            {
+                BRANCH(2);
+                deltaP_2 = deltaP_x_1 = deltaP_y_1 = deltaP_x_2 = deltaP_y_2 = 0.0;
+            }
+            else
+            {
+                BRANCH(3);
+                FLOPS(1, 3, 0, 0, complete_function);
+                deltaP_2 = -u_b * deltaP * contact_point_velocity_z * inv_cbm;
+                if (deltaP_2 > 0.0)
+                {
+                    BRANCH(4);
+                    deltaP_x_1 = deltaP_y_1 = 0.0;
+                    if (unlikely(surface_velocity_x_2 == 0.0 && surface_velocity_y_2 == 0))
+                    {
+                        BRANCH(5);
+                        deltaP_x_2 = deltaP_y_2 = 0.0;
+                    }
+                    else
+                    {
+                        BRANCH(6);
+                        FLOPS(1, 3, 0, 0, complete_function);
+                        double sv2sq = fma(surface_velocity_x_2, surface_velocity_x_2, surface_velocity_y_2 * surface_velocity_y_2);
+                        // fast rsqrt(sv2sq):
+                        float fs = (float)sv2sq;
+                        float rs = _mm_cvtss_f32(_mm_rsqrt_ss(_mm_set_ss((float)sv2sq)));
+                        double inv_sv2 = (double)rs * fma(rs * rs, -0.5 * sv2sq, 1.5);
+                        deltaP_x_2 = -u_s2 * surface_velocity_x_2 * inv_sv2 * deltaP_2;
+                        deltaP_y_2 = -u_s2 * surface_velocity_y_2 * inv_sv2 * deltaP_2;
+                    }
+                }
+                else
+                {
+                    BRANCH(7);
+                    deltaP_x_2 = deltaP_y_2 = 0.0;
+                    if (unlikely(surface_velocity_x_1 == 0.0 && surface_velocity_y_1 == 0))
+                    {
+                        BRANCH(8);
+                        deltaP_x_1 = deltaP_y_1 = 0.0;
+                    }
+                    else
+                    {
+                        BRANCH(9);
+                        double sv1sq = fma(surface_velocity_x_1, surface_velocity_x_1, surface_velocity_y_1 * surface_velocity_y_1);
+                        // fast rsqrt(sv1sq):
+                        float ft = (float)sv1sq;
+                        float rt = _mm_cvtss_f32(_mm_rsqrt_ss(_mm_set_ss((float)sv1sq)));
+                        double inv_sv1 = (double)rt * fma(rt * rt, -0.5 * sv1sq, 1.5);
+                        deltaP_x_1 = u_s1 * surface_velocity_x_1 * inv_sv1 * deltaP_2;
+                        deltaP_y_1 = u_s1 * surface_velocity_y_1 * inv_sv1 * deltaP_2;
+                    }
+                }
+            }
+        }
+        END_PROFILE(impulse);
+
+        /* ---- update linear & angular velocities ---- */
+        START_PROFILE(delta);
+
+        local_velocity_x_1 = fma(invM, (deltaP_1 + deltaP_x_1), local_velocity_x_1);
+        local_velocity_y_1 = fma(invM, deltaP_y_1 - deltaP, local_velocity_y_1);
+        local_velocity_x_2 = fma(invM, deltaP_x_2 - deltaP_1, local_velocity_x_2);
+        local_velocity_y_2 = fma(invM, deltaP + deltaP_y_2, local_velocity_y_2);
+
+        local_angular_velocity_x_1 = fma(C, (deltaP_2 + deltaP_y_1), local_angular_velocity_x_1);
+        local_angular_velocity_y_1 = fma(C, -deltaP_x_1, local_angular_velocity_y_1); // what about using fmsub?
+        local_angular_velocity_z_1 = fma(C, -deltaP_1, local_angular_velocity_z_1);
+
+        local_angular_velocity_x_2 = fma(C, (deltaP_2 + deltaP_y_2), local_angular_velocity_x_2);
+        local_angular_velocity_y_2 = fma(C, -deltaP_x_2, local_angular_velocity_y_2);
+        local_angular_velocity_z_2 = fma(C, -deltaP_1, local_angular_velocity_z_2);
+        END_PROFILE(delta);
+
+        /* ---- recompute for next iteration ---- */
+        START_PROFILE(velocity);
+        surface_velocity_x_1 = fma(R, local_angular_velocity_y_1, local_velocity_x_1);
+        surface_velocity_y_1 = fma(-R, local_angular_velocity_x_1, local_velocity_y_1);
+        surface_velocity_x_2 = fma(R, local_angular_velocity_y_2, local_velocity_x_2);
+        surface_velocity_y_2 = fma(-R, local_angular_velocity_x_2, local_velocity_y_2);
+
+        // Newton‐step update for contact_inv_mag
+        contact_point_velocity_x = fma(-R, local_angular_velocity_z_1 + local_angular_velocity_z_2, local_velocity_x_1 - local_velocity_x_2);
+        contact_point_velocity_z = R * (local_angular_velocity_x_1 + local_angular_velocity_x_2);
+
+        contact_inv_mag *= 0.5 * fma(-contact_inv_mag * contact_inv_mag, fma(contact_point_velocity_x, contact_point_velocity_x, contact_point_velocity_z * contact_point_velocity_z), 3.0);
+
+        ball_ball_contact_point_magnitude = 1.0 / contact_inv_mag;
+
+        double old_y = velocity_diff_y;
+        velocity_diff_y = local_velocity_y_2 - local_velocity_y_1;
+        total_work = fma(0.5 * deltaP, fabs(old_y + velocity_diff_y), total_work);
+        if (work_compression == 0.0 && velocity_diff_y > 0.0)
+        {
+            work_compression = total_work;
+            work_required = (fma(e_b, e_b, 1.0)) * work_compression;
+        }
+        END_PROFILE(velocity);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* ---------------------- epilogue – UNCHANGED ----------------------- */
+    /* ------------------------------------------------------------------ */
+    START_PROFILE(after_loop);
+
+    rvw1_result[3] = fma(local_velocity_x_1, forward[1], local_velocity_y_1 * forward[0]);
+    rvw2_result[3] = fma(local_velocity_x_2, forward[1], local_velocity_y_2 * forward[0]);
+
+    rvw1_result[4] = fma(local_velocity_x_1, forward[3], local_velocity_y_1 * forward[1]);
+    rvw2_result[4] = fma(local_velocity_x_2, forward[3], local_velocity_y_2 * forward[1]);
+
+    rvw1_result[5] = local_velocity_y_1 * forward[2];
+    rvw2_result[5] = local_velocity_y_2 * forward[2];
+
+    rvw1_result[6] = fma(local_angular_velocity_x_1, forward[1], local_angular_velocity_y_1 * forward[0]);
+    rvw2_result[6] = fma(local_angular_velocity_x_2, forward[1], local_angular_velocity_y_2 * forward[0]);
+
+    rvw1_result[7] = fma(local_angular_velocity_x_1, forward[3], local_angular_velocity_y_1 * forward[1]);
+    rvw2_result[7] = fma(local_angular_velocity_x_2, forward[3], local_angular_velocity_y_2 * forward[1]);
+
+    rvw1_result[8] = local_angular_velocity_z_1;
+    rvw2_result[8] = local_angular_velocity_z_2;
+
+    END_PROFILE(after_loop);
+    END_PROFILE(complete_function);
+    __asm volatile("# LLVM-MCA-END" ::: "memory");
+}
+
+
+DLL_EXPORT void recip_sqrt_double_while(double *restrict rvw1, double *restrict rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double *restrict rvw1_result, double *restrict rvw2_result, Profile *profiles, Branch *branches)
+{
+    __asm volatile("# LLVM-MCA-BEGIN collide_balls_recip_sqrt" ::: "memory");
+#ifdef PROFILE
+    Profile *complete_function = &profiles[0];
+    Profile *before_loop = &profiles[1];
+    Profile *impulse = &profiles[2];
+    Profile *delta = &profiles[3];
+    Profile *velocity = &profiles[4];
+    Profile *after_loop = &profiles[5];
+#endif
+    START_PROFILE(complete_function);
+    START_PROFILE(before_loop);
+
+    MEMORY(18, complete_function, before_loop);
+    double *translation_1 = rvw1;
+    double *velocity_1 = &rvw1[3];
+    double *angular_velocity_1 = &rvw1[6];
+
+    double *translation_2 = rvw2;
+    double *velocity_2 = &rvw2[3];
+    double *angular_velocity_2 = &rvw2[6];
+
+    /* ------------------------------------------------------------------ */
+    /* ----------------------   scalar tweaks   -------------------------- */
+    /* ------------------------------------------------------------------ */
+
     double invM = 1.0 / M; /* division → multiply   */
     double invR = 1.0 / R;
     double C = 5.0 * invM * invR * 0.5; /* 5/(2MR) */
@@ -1313,7 +1601,6 @@ DLL_EXPORT void recip_sqrt(double *restrict rvw1, double *restrict rvw2, float R
     /* bookkeeping (unchanged) */
     double total_work = 0.0;
     double work_required = INFINITY;
-    double work_compression = 0.0;
 
     double deltaP_1 = deltaP, deltaP_2 = deltaP;
     double deltaP_x_1 = 0, deltaP_y_1 = 0, deltaP_x_2 = 0, deltaP_y_2 = 0;
@@ -1321,7 +1608,7 @@ DLL_EXPORT void recip_sqrt(double *restrict rvw1, double *restrict rvw2, float R
     END_PROFILE(before_loop);
     // before the loop:
     // …then END_PROFILE(before_loop);
-    while (velocity_diff_y < 0.0 || total_work < work_required)
+    while (true)
     {
         /* -------------------- impulse calculation -------------------- */
         START_PROFILE(impulse);
@@ -1458,14 +1745,133 @@ DLL_EXPORT void recip_sqrt(double *restrict rvw1, double *restrict rvw2, float R
         double old_y = velocity_diff_y;
         velocity_diff_y = local_velocity_y_2 - local_velocity_y_1;
         total_work = fma(0.5 * deltaP, fabs(old_y + velocity_diff_y), total_work);
-        if (work_compression == 0.0 && velocity_diff_y > 0.0)
+        if (velocity_diff_y > 0.0)
         {
-            FLOPS(1, 2, 0, 0, complete_function, velocity);
-            work_compression = total_work;
-            work_required = (fma(e_b, e_b, 1.0)) * work_compression;
+            work_required = (fma(e_b, e_b, 1.0)) * total_work;
+            break;
         }
         END_PROFILE(velocity);
     }
+
+    while (velocity_diff_y < 0.0 || total_work < work_required)
+        {
+            /* -------------------- impulse calculation -------------------- */
+            START_PROFILE(impulse);
+            if (unlikely(ball_ball_contact_point_magnitude < 1e-16))
+            {
+                BRANCH(0);
+                deltaP_1 = deltaP_2 = 0.0;
+                deltaP_x_1 = deltaP_y_1 = deltaP_x_2 = deltaP_y_2 = 0.0;
+            }
+            else
+            {
+                BRANCH(1);
+                double cbm2 = fma(contact_point_velocity_x, contact_point_velocity_x, contact_point_velocity_z * contact_point_velocity_z);
+
+                // --- fast approx reciprocal sqrt of cbm2 ---
+                // 1) approximate via double-precision Newton step on float rsqrt
+                float f = (float)cbm2;
+                float r = _mm_cvtss_f32(
+                    _mm_rsqrt_ss(
+                        _mm_set_ss((float)cbm2)));
+                // refine to double precision: inv = r*(1.5 - 0.5*cbm2*r*r)
+                double inv_cbm = (double)r;
+                inv_cbm = inv_cbm * fma(inv_cbm * inv_cbm, -0.5 * cbm2, 1.5);
+                // ------------------------------------------------------------
+
+                deltaP_1 = -u_b * deltaP * contact_point_velocity_x * inv_cbm;
+                if (unlikely(fabs(contact_point_velocity_z) < 1e-16))
+                {
+                    BRANCH(2);
+                    deltaP_2 = deltaP_x_1 = deltaP_y_1 = deltaP_x_2 = deltaP_y_2 = 0.0;
+                }
+                else
+                {
+                    BRANCH(3);
+                    deltaP_2 = -u_b * deltaP * contact_point_velocity_z * inv_cbm;
+                    if (deltaP_2 > 0.0)
+                    {
+                        BRANCH(4);
+                        deltaP_x_1 = deltaP_y_1 = 0.0;
+                        if (unlikely(surface_velocity_x_2 == 0.0 && surface_velocity_y_2 == 0))
+                        {
+                            BRANCH(5);
+                            deltaP_x_2 = deltaP_y_2 = 0.0;
+                        }
+                        else
+                        {
+                            BRANCH(6);
+                            double sv2sq = fma(surface_velocity_x_2, surface_velocity_x_2, surface_velocity_y_2 * surface_velocity_y_2);
+                            // fast rsqrt(sv2sq):
+                            float fs = (float)sv2sq;
+                            float rs = _mm_cvtss_f32(_mm_rsqrt_ss(_mm_set_ss((float)sv2sq)));
+                            double inv_sv2 = (double)rs * fma(rs * rs, -0.5 * sv2sq, 1.5);
+                            deltaP_x_2 = -u_s2 * surface_velocity_x_2 * inv_sv2 * deltaP_2;
+                            deltaP_y_2 = -u_s2 * surface_velocity_y_2 * inv_sv2 * deltaP_2;
+                        }
+                    }
+                    else
+                    {
+                        BRANCH(7);
+                        deltaP_x_2 = deltaP_y_2 = 0.0;
+                        if (unlikely(surface_velocity_x_1 == 0.0 && surface_velocity_y_1 == 0))
+                        {
+                            BRANCH(8);
+                            deltaP_x_1 = deltaP_y_1 = 0.0;
+                        }
+                        else
+                        {
+                            BRANCH(9);
+                            double sv1sq = fma(surface_velocity_x_1, surface_velocity_x_1, surface_velocity_y_1 * surface_velocity_y_1);
+                            // fast rsqrt(sv1sq):
+                            float ft = (float)sv1sq;
+                            float rt = _mm_cvtss_f32(_mm_rsqrt_ss(_mm_set_ss((float)sv1sq)));
+                            double inv_sv1 = (double)rt * fma(rt * rt, -0.5 * sv1sq, 1.5);
+                            deltaP_x_1 = u_s1 * surface_velocity_x_1 * inv_sv1 * deltaP_2;
+                            deltaP_y_1 = u_s1 * surface_velocity_y_1 * inv_sv1 * deltaP_2;
+                        }
+                    }
+                }
+            }
+            END_PROFILE(impulse);
+
+            /* ---- update linear & angular velocities ---- */
+            START_PROFILE(delta);
+
+            local_velocity_x_1 = fma(invM, (deltaP_1 + deltaP_x_1), local_velocity_x_1);
+            local_velocity_y_1 = fma(invM, deltaP_y_1 - deltaP, local_velocity_y_1);
+            local_velocity_x_2 = fma(invM, deltaP_x_2 - deltaP_1, local_velocity_x_2);
+            local_velocity_y_2 = fma(invM, deltaP + deltaP_y_2, local_velocity_y_2);
+
+            local_angular_velocity_x_1 = fma(C, (deltaP_2 + deltaP_y_1), local_angular_velocity_x_1);
+            local_angular_velocity_y_1 = fma(C, -deltaP_x_1, local_angular_velocity_y_1); // what about using fmsub?
+            local_angular_velocity_z_1 = fma(C, -deltaP_1, local_angular_velocity_z_1);
+
+            local_angular_velocity_x_2 = fma(C, (deltaP_2 + deltaP_y_2), local_angular_velocity_x_2);
+            local_angular_velocity_y_2 = fma(C, -deltaP_x_2, local_angular_velocity_y_2);
+            local_angular_velocity_z_2 = fma(C, -deltaP_1, local_angular_velocity_z_2);
+            END_PROFILE(delta);
+
+            /* ---- recompute for next iteration ---- */
+            START_PROFILE(velocity);
+            surface_velocity_x_1 = fma(R, local_angular_velocity_y_1, local_velocity_x_1);
+            surface_velocity_y_1 = fma(-R, local_angular_velocity_x_1, local_velocity_y_1);
+            surface_velocity_x_2 = fma(R, local_angular_velocity_y_2, local_velocity_x_2);
+            surface_velocity_y_2 = fma(-R, local_angular_velocity_x_2, local_velocity_y_2);
+
+            // Newton‐step update for contact_inv_mag
+            contact_point_velocity_x = fma(-R, local_angular_velocity_z_1 + local_angular_velocity_z_2, local_velocity_x_1 - local_velocity_x_2);
+            contact_point_velocity_z = R * (local_angular_velocity_x_1 + local_angular_velocity_x_2);
+
+            contact_inv_mag *= 0.5 * fma(-contact_inv_mag * contact_inv_mag, fma(contact_point_velocity_x, contact_point_velocity_x, contact_point_velocity_z * contact_point_velocity_z), 3.0);
+
+            ball_ball_contact_point_magnitude = 1.0 / contact_inv_mag;
+
+            double old_y = velocity_diff_y;
+            velocity_diff_y = local_velocity_y_2 - local_velocity_y_1;
+            total_work = fma(0.5 * deltaP, fabs(old_y + velocity_diff_y), total_work);
+            END_PROFILE(velocity);
+        }
 
     /* ------------------------------------------------------------------ */
     /* ---------------------- epilogue – UNCHANGED ----------------------- */
@@ -1499,6 +1905,8 @@ DLL_EXPORT void recip_sqrt(double *restrict rvw1, double *restrict rvw2, float R
     END_PROFILE(complete_function);
     __asm volatile("# LLVM-MCA-END" ::: "memory");
 }
+
+
 
 DLL_EXPORT void recip_sqrt_less_if(double *restrict rvw1, double *restrict rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double *restrict rvw1_result, double *restrict rvw2_result, Profile *profiles, Branch *branches)
 {
@@ -1662,6 +2070,252 @@ DLL_EXPORT void recip_sqrt_less_if(double *restrict rvw1, double *restrict rvw2,
         {
             deltaP_2.d = deltaP_x_1.d = deltaP_y_1.d = deltaP_x_2.d = deltaP_y_2.d = 0.0;
         }
+
+        END_PROFILE(impulse);
+        START_PROFILE(delta);
+
+        local_velocity_x_1 = fma(invM, (deltaP_1.d + deltaP_x_1.d), local_velocity_x_1);
+        local_velocity_y_1 = fma(invM, deltaP_y_1.d - deltaP, local_velocity_y_1);
+        local_velocity_x_2 = fma(invM, deltaP_x_2.d - deltaP_1.d, local_velocity_x_2);
+        local_velocity_y_2 = fma(invM, deltaP + deltaP_y_2.d, local_velocity_y_2);
+
+        local_angular_velocity_x_1 = fma(C, (deltaP_2.d + deltaP_y_1.d), local_angular_velocity_x_1);
+        local_angular_velocity_y_1 = fma(C, -deltaP_x_1.d, local_angular_velocity_y_1);
+        local_angular_velocity_z_1 = fma(C, -deltaP_1.d, local_angular_velocity_z_1);
+
+        local_angular_velocity_x_2 = fma(C, (deltaP_2.d + deltaP_y_2.d), local_angular_velocity_x_2);
+        local_angular_velocity_y_2 = fma(C, -deltaP_x_2.d, local_angular_velocity_y_2);
+        local_angular_velocity_z_2 = fma(C, -deltaP_1.d, local_angular_velocity_z_2);
+
+        END_PROFILE(delta);
+        START_PROFILE(velocity);
+
+        surface_velocity_x_1 = fma(R, local_angular_velocity_y_1, local_velocity_x_1);
+        surface_velocity_y_1 = fma(-R, local_angular_velocity_x_1, local_velocity_y_1);
+        surface_velocity_x_2 = fma(R, local_angular_velocity_y_2, local_velocity_x_2);
+        surface_velocity_y_2 = fma(-R, local_angular_velocity_x_2, local_velocity_y_2);
+
+        contact_point_velocity_x = fma(-R, local_angular_velocity_z_1 + local_angular_velocity_z_2,
+                                       local_velocity_x_1 - local_velocity_x_2);
+        contact_point_velocity_z = R * (local_angular_velocity_x_1 + local_angular_velocity_x_2);
+
+        contact_inv_mag *= 0.5 * fma(-contact_inv_mag * contact_inv_mag,
+                                     fma(contact_point_velocity_x, contact_point_velocity_x,
+                                         contact_point_velocity_z * contact_point_velocity_z),
+                                     3.0);
+
+        ball_ball_contact_point_magnitude = 1.0 / contact_inv_mag;
+
+        old_y = velocity_diff_y;
+        velocity_diff_y = local_velocity_y_2 - local_velocity_y_1;
+        total_work = fma(0.5 * deltaP, fabs(old_y + velocity_diff_y), total_work);
+
+        if (work_compression == 0.0 && velocity_diff_y > 0.0)
+        {
+            work_compression = total_work;
+            work_required = fma(e_b, e_b, 1.0) * work_compression;
+        }
+
+        END_PROFILE(velocity);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* ---------------------- epilogue – UNCHANGED ----------------------- */
+    /* ------------------------------------------------------------------ */
+    START_PROFILE(after_loop);
+
+    rvw1_result[3] = fma(local_velocity_x_1, forward[1], local_velocity_y_1 * forward[0]);
+    rvw2_result[3] = fma(local_velocity_x_2, forward[1], local_velocity_y_2 * forward[0]);
+
+    rvw1_result[4] = fma(local_velocity_x_1, forward[3], local_velocity_y_1 * forward[1]);
+    rvw2_result[4] = fma(local_velocity_x_2, forward[3], local_velocity_y_2 * forward[1]);
+
+    rvw1_result[5] = local_velocity_y_1 * forward[2];
+    rvw2_result[5] = local_velocity_y_2 * forward[2];
+
+    rvw1_result[6] = fma(local_angular_velocity_x_1, forward[1], local_angular_velocity_y_1 * forward[0]);
+    rvw2_result[6] = fma(local_angular_velocity_x_2, forward[1], local_angular_velocity_y_2 * forward[0]);
+
+    rvw1_result[7] = fma(local_angular_velocity_x_1, forward[3], local_angular_velocity_y_1 * forward[1]);
+    rvw2_result[7] = fma(local_angular_velocity_x_2, forward[3], local_angular_velocity_y_2 * forward[1]);
+
+    rvw1_result[8] = local_angular_velocity_z_1;
+    rvw2_result[8] = local_angular_velocity_z_2;
+
+    END_PROFILE(after_loop);
+    END_PROFILE(complete_function);
+    __asm volatile("# LLVM-MCA-END" ::: "memory");
+}
+
+DLL_EXPORT void recip_sqrt_masks(double *restrict rvw1, double *restrict rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double *restrict rvw1_result, double *restrict rvw2_result, Profile *profiles, Branch *branches)
+{
+    __asm volatile("# LLVM-MCA-BEGIN collide_balls_recip_sqrt_less_if" ::: "memory");
+#ifdef PROFILE
+    Profile *complete_function = &profiles[0];
+    Profile *before_loop = &profiles[1];
+    Profile *impulse = &profiles[2];
+    Profile *delta = &profiles[3];
+    Profile *velocity = &profiles[4];
+    Profile *after_loop = &profiles[5];
+#endif
+    START_PROFILE(complete_function);
+    START_PROFILE(before_loop);
+
+    MEMORY(18, complete_function, before_loop);
+    double *translation_1 = rvw1;
+    double *velocity_1 = &rvw1[3];
+    double *angular_velocity_1 = &rvw1[6];
+
+    double *translation_2 = rvw2;
+    double *velocity_2 = &rvw2[3];
+    double *angular_velocity_2 = &rvw2[6];
+
+    /* ------------------------------------------------------------------ */
+    /* ----------------------   scalar tweaks   -------------------------- */
+    /* ------------------------------------------------------------------ */
+
+    double invM = 1.0 / M; /* division → multiply   */
+    double invR = 1.0 / R;
+    double C = 5.0 * invM * invR * 0.5; /* 5/(2MR) */
+
+    double offset[3];
+    offset[0] = translation_2[0] - translation_1[0];
+    offset[1] = translation_2[1] - translation_1[1];
+    offset[2] = translation_2[2] - translation_1[2];
+
+    double offset_mag_sqrd = fma(offset[0], offset[0], fma(offset[1], offset[1], offset[2] * offset[2]));
+
+    double offset_inv_mag = 1.0 / sqrt(offset_mag_sqrd);
+
+    // Accuracy impact!
+    // offset_inv_mag = _mm_cvtss_f32(_mm_rsqrt_ss(_mm_set_ss((float)offset_mag_sqrd)));
+
+    double forward[4];
+    forward[0] = offset[0] * offset_inv_mag;
+    forward[1] = offset[1] * offset_inv_mag;
+    forward[2] = offset[2] * offset_inv_mag;
+    forward[3] = -forward[0]; // right[1]
+
+    /* ---------------- velocities to local frame ----------------------- */
+    double local_velocity_x_1 = fma(velocity_1[0], forward[1], velocity_1[1] * forward[3]);
+    double local_velocity_y_1 = fma(velocity_1[0], forward[0], fma(velocity_1[1], forward[1], velocity_1[2] * forward[2]));
+    double local_velocity_x_2 = fma(velocity_2[0], forward[1], velocity_2[1] * forward[3]);
+    double local_velocity_y_2 = fma(velocity_2[0], forward[0], fma(velocity_2[1], forward[1], velocity_2[2] * forward[2]));
+
+    /* --------------- angular velocities to local frame ---------------- */
+    double local_angular_velocity_x_1 = fma(angular_velocity_1[0], forward[1], angular_velocity_1[1] * forward[3]);
+    double local_angular_velocity_y_1 = fma(angular_velocity_1[0], forward[0], fma(angular_velocity_1[1], forward[1], angular_velocity_1[2] * forward[2]));
+    double local_angular_velocity_z_1 = angular_velocity_1[2];
+
+    double local_angular_velocity_x_2 = fma(angular_velocity_2[0], forward[1], angular_velocity_2[1] * forward[3]);
+    double local_angular_velocity_y_2 = fma(angular_velocity_2[0], forward[0], fma(angular_velocity_2[1], forward[1], angular_velocity_2[2] * forward[2]));
+    double local_angular_velocity_z_2 = angular_velocity_2[2];
+
+    /* ---------------- surface‑velocity helpers (use fma) -------------- */
+    double surface_velocity_x_1 = fma(R, local_angular_velocity_y_1, local_velocity_x_1);
+    double surface_velocity_y_1 = fma(-R, local_angular_velocity_x_1, local_velocity_y_1);
+    double surface_velocity_x_2 = fma(R, local_angular_velocity_y_2, local_velocity_x_2);
+    double surface_velocity_y_2 = fma(-R, local_angular_velocity_x_2, local_velocity_y_2);
+    /*
+    double surface_velocity_mag1_sq = surface_velocity_x_1*surface_velocity_x_1
+                                    + surface_velocity_y_1*surface_velocity_y_1;
+    double surface_velocity_mag2_sq = surface_velocity_x_2*surface_velocity_x_2
+                                    + surface_velocity_y_2*surface_velocity_y_2;
+    */
+
+    /* ---------------------- contact point slip ------------------------ */
+    double contact_point_velocity_x = fma(-R, (local_angular_velocity_z_1 + local_angular_velocity_z_2), local_velocity_x_1 - local_velocity_x_2);
+    double contact_point_velocity_z = R * (local_angular_velocity_x_1 + local_angular_velocity_x_2);
+    double contact_inv_mag = 1.0 / sqrt(fma(contact_point_velocity_x, contact_point_velocity_x, contact_point_velocity_z * contact_point_velocity_z));
+    double ball_ball_contact_point_magnitude =
+        1.0 / contact_inv_mag; /* keep original scalar around for profiling */
+
+    /* --------------------------- impulse step ------------------------- */
+    double velocity_diff_y = local_velocity_y_2 - local_velocity_y_1;
+
+    if (unlikely(deltaP == 0.0f))
+    {
+        deltaP = 0.5 * (1.0 + e_b) * M * fabs(velocity_diff_y) / (double)N;
+    }
+
+    /* bookkeeping (unchanged) */
+    double total_work = 0.0;
+    double work_required = INFINITY;
+    double work_compression = 0.0;
+
+    union
+    {
+        double d;
+        uint64_t u;
+    } deltaP_1, deltaP_2, deltaP_x_1, deltaP_y_1, deltaP_x_2, deltaP_y_2;
+
+    // Temporary vars moved out of loop
+    double cbm2, inv_cbm, sv2sq, inv_sv2, sv1sq, inv_sv1, old_y;
+    float f, r, fs, rs, ft, rt;
+
+    END_PROFILE(before_loop);
+
+    while (velocity_diff_y < 0.0 || total_work < work_required)
+    {
+        cbm2 = fma(contact_point_velocity_x, contact_point_velocity_x,
+                   contact_point_velocity_z * contact_point_velocity_z);
+
+        f = (float)cbm2;
+        r = _mm_cvtss_f32(_mm_rsqrt_ss(_mm_set_ss(f)));
+        inv_cbm = (double)r;
+        inv_cbm *= fma(inv_cbm * inv_cbm, -0.5 * cbm2, 1.5);
+
+        deltaP_1.d = -u_b * deltaP * contact_point_velocity_x * inv_cbm;
+        deltaP_2.d = -u_b * deltaP * contact_point_velocity_z * inv_cbm;
+
+        sv2sq = fma(surface_velocity_x_2, surface_velocity_x_2,
+                    surface_velocity_y_2 * surface_velocity_y_2);
+        fs = (float)sv2sq;
+        rs = _mm_cvtss_f32(_mm_rsqrt_ss(_mm_set_ss(fs)));
+        inv_sv2 = rs * fma(rs * rs, -0.5 * sv2sq, 1.5);
+
+        deltaP_x_2.d = -u_s2 * surface_velocity_x_2 * inv_sv2 * deltaP_2.d;
+        deltaP_y_2.d = -u_s2 * surface_velocity_y_2 * inv_sv2 * deltaP_2.d;
+
+        sv1sq = fma(surface_velocity_x_1, surface_velocity_x_1,
+                    surface_velocity_y_1 * surface_velocity_y_1);
+        ft = (float)sv1sq;
+        rt = _mm_cvtss_f32(_mm_rsqrt_ss(_mm_set_ss(ft)));
+        inv_sv1 = rt * fma(rt * rt, -0.5 * sv1sq, 1.5);
+
+        deltaP_x_1.d = u_s1 * surface_velocity_x_1 * inv_sv1 * deltaP_2.d;
+        deltaP_y_1.d = u_s1 * surface_velocity_y_1 * inv_sv1 * deltaP_2.d;
+
+        u_int64_t mask = -(u_int64_t)(fabs(contact_point_velocity_z) >= 1e-16);
+        deltaP_2.u &= mask;
+        deltaP_x_1.u &= mask;
+        deltaP_y_1.u &= mask;
+        deltaP_x_2.u &= mask;
+        deltaP_y_2.u &= mask;
+
+        // if (likely(fabs(contact_point_velocity_z) >= 1e-16))
+        // {
+            if (deltaP_2.d > 0.0)
+            {
+                deltaP_x_1.d = deltaP_y_1.d = 0.0;
+                if (unlikely(surface_velocity_x_2 == 0.0 && surface_velocity_y_2 == 0))
+                {
+                    deltaP_x_2.d = deltaP_y_2.d = 0.0;
+                }
+            }
+            else
+            {
+                deltaP_x_2.d = deltaP_y_2.d = 0.0;
+                if (unlikely(surface_velocity_x_1 == 0.0 && surface_velocity_y_1 == 0))
+                {
+                    deltaP_x_1.d = deltaP_y_1.d = 0.0;
+                }
+            }
+        // }
+        // else
+        // {
+        //     deltaP_2.d = deltaP_x_1.d = deltaP_y_1.d = deltaP_x_2.d = deltaP_y_2.d = 0.0;
+        // }
 
         END_PROFILE(impulse);
         START_PROFILE(delta);

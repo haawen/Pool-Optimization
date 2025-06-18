@@ -281,8 +281,11 @@ void test_recip_sqrt(void)
     call_function("Approx + Symmetry", recip_sqrt);
 }
 
-void test_recip_sqrt_hoist(void)
-{
+void test_recip_sqrt_double_while(void) {
+    call_function("Reciprocal Sqrt Double While", recip_sqrt_double_while);
+}
+
+void test_recip_sqrt_hoist(void) {
     call_function("Reciprocal Sqrt Hoist", recip_sqrt_hoist);
 }
 
@@ -294,6 +297,11 @@ void test_recip_sqrt_ifs(void)
 void test_recip_sqrt_less_ifs(void)
 {
     call_function("Reciprocal Sqrt Less IF", recip_sqrt_less_if);
+}
+
+void test_recip_sqrt_masks(void)
+{
+    call_function("Reciprocal Sqrt Masks", recip_sqrt_masks);
 }
 
 void test_collide_balls_simd(void)
@@ -346,21 +354,9 @@ int main()
     srand((unsigned int)time(NULL));
 
     void (*tests[])(void) = {
-        test_collide_balls_basic,
-        test_scalar_sqrt,
-        test_approx_sqrt,
         test_recip_sqrt,
-        test_collide_balls_simd,
-        test_collide_balls_code_motion,
-        test_simd_collide_ball_2,
-        test_improved_symmetry,
-        test_collide_balls_simd2,
-        test_collide_balls_simd3,
-        test_register_relieve,
-        test_recip_sqrt_ifs,
-        test_recip_sqrt_less_ifs,
-        test_simd_ssa,
-        test_recip_sqrt_hoist,
+        // test_recip_sqrt_masks
+        // test_recip_sqrt_double_while
     };
 
     const char *function_names[] = {
@@ -402,7 +398,7 @@ int main()
 
         for (int i = 0; i < NUM_FUNCTIONS; i++)
         {
-            printf("\n--- Running test %d: %s ---\n", i, function_names[i]);
+            // printf("\n--- Running test %d: %s ---\n", i, function_names[i]);
             RUN_TEST(tests[i]);
         }
 

@@ -33,9 +33,13 @@ color_styles = {
     "Register Relieve": "DarkSlateGray",
     "Reciprocal Sqrt Hoist": "Yellow",
     "SIMD SSD": "DarkTurquoise",
+    "Reciprocal Sqrt Double While": "DarkTurquoise",
+    "Reciprocal Sqrt Masks": "DarkTurquoise",
 }
 
 
+
+exit(0)
 
 # Make sure the output directory exists
 os.makedirs("plots", exist_ok=True)
@@ -45,111 +49,10 @@ df = pd.read_csv("build/benchmark.csv")
 df["Test Case"] = "TC " + df["Test Case"].astype(str)
 
 # Compute average cycles per (Function, Test Case)
-grouped = (
-    df.groupby(["Function", "Test Case"])[["Cycles"]]
-      .mean()
-      .reset_index()
-)
+grouped = df.groupby(["Function", "Test Case"])[["Cycles"]].mean().reset_index()
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 2) READ & PREPROCESS THE BENCHMARK.CSV
-# ─────────────────────────────────────────────────────────────────────────────
-#    Columns of build/benchmark.csv:
-#      Function, Test Case, Iteration, Cycles
-#
-bench_df = pd.read_csv("build/benchmark.csv")
-bench_df["Test Case"] = "TC " + bench_df["Test Case"].astype(str) 
-
-# Compute mean cycles per (Function, Test Case) for benchmark data:
-bench_grouped = (
-    bench_df
-    .groupby(["Function", "Test Case"])[["Cycles"]]
-    .mean()
-    .reset_index()
-)
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 3) READ & PREPROCESS THE ORIGINAL.CSV
-# ─────────────────────────────────────────────────────────────────────────────
-#    original.csv has no header, but each line is:
-#      Original, <Test Case>, <Iteration>, <Cycles>
-#    Example:
-#      Original,0,0,246679
-#      Original,0,1,181633
-#      Original,0,2,176453
-#
-orig_df = pd.read_csv(
-    "build/original.csv",
-    # header=None,
-    # names=["Function", "Test Case", "Iteration", "Cycles"]
-)
-# All rows in this file have Function == "Original"
-orig_df["Test Case"] = "TC " + orig_df["Test Case"].astype(str)
-
-# Compute mean cycles per (Function="Original", Test Case) for original data:
-orig_grouped = (
-    orig_df
-    .groupby(["Function", "Test Case"])[["Cycles"]]
-    .mean()
-    .reset_index()
-)
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 4) CONCATENATE BENCHMARK + ORIGINAL GROUPS
-# ─────────────────────────────────────────────────────────────────────────────
-#    Now we have two DataFrames with columns ["Function","Test Case","Cycles"].
-#    We'll stack them so every plot includes "Original" alongside the other functions.
-#
-grouped_all = pd.concat([bench_grouped, orig_grouped], ignore_index=True)
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 5) BUILD A CONSISTENT COLOR MAP FOR ALL FUNCTIONS (INCLUDING "Original")
-# ─────────────────────────────────────────────────────────────────────────────
-all_funcs = sorted(grouped_all["Function"].unique())
-num_funcs = len(all_funcs)
-
-# Choose a categorical colormap. Here we pick "tab10" (10 distinct colors). 
-# If you have >10 functions, it will cycle through.
-cmap = plt.get_cmap("tab10")
-
-func_to_color = {
-    func: cmap(i % cmap.N)
-    for i, func in enumerate(all_funcs)
-}
-
-# (Optional) Print to verify:
-# for func, color in func_to_color.items():
-#     print(func, "→", color)
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 6) DEFINE AN X‐AXIS FORMATTER TO SHOW THOUSANDS AS “k”
-# ─────────────────────────────────────────────────────────────────────────────
-def thousands_formatter(x, pos):
-    """
-    Convert a raw number (e.g. 50000) into a string like "50 k" or "75.4 k".
-    This will be used by FuncFormatter.
-    """
-    val = x / 1000.0
-    if val.is_integer():
-        return f"{int(val)} k"
-    else:
-        return f"{val:.1f} k"
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 7) PLOT ONE HORIZONTAL‐BAR CHART PER TEST CASE
-# ─────────────────────────────────────────────────────────────────────────────
-#    This loop generates:
-#      plots/benchmark_TC_0_horizontal.png
-#      plots/benchmark_TC_1_horizontal.png
-#      ...
-#      plots/benchmark_TC_4_horizontal.png
-#
-#  a) Find all unique test‐cases, sorted by their numeric suffix (0,1,2,3,4).
-all_tcs = sorted(grouped_all["Test Case"].unique(), key=lambda s: int(s.split()[-1]))
-
-plt.rcParams.update({'figure.autolayout': True})  # auto‐tight layout
+plt.rcParams.update({"figure.autolayout": True})  # ensure tight layout
 
 for tc in all_tcs:
     # b) Filter to exactly this test case
@@ -161,10 +64,12 @@ for tc in all_tcs:
     cycles_vals = subset_sorted["Cycles"].tolist()
     y_pos = np.arange(len(functions))
 
-    # d) Make a wider figure so labels never clip
-    fig_width = 8
-    fig_height = len(functions) * 0.4 + 1
-    fig, ax = plt.subplots(figsize=(fig_width, fig_height))
+    fig, ax = plt.subplots(figsize=(6, len(functions) * 0.4 + 1))
+    ax.barh(y_pos, cycles_vals, color="C0", edgecolor="black")
+    for i, val in enumerate(cycles_vals):
+        ax.text(
+            val * 1.005, i, f"{int(round(val, 0))}", va="center", ha="left", fontsize=9
+        )
 
     # e) Draw one horizontal bar per function, using its assigned color
     for i, func in enumerate(functions):
@@ -218,34 +123,11 @@ for tc in all_tcs:
 avg_all = grouped_all.groupby("Function")[["Cycles"]].mean().reset_index()
 avg_all_sorted = avg_all.sort_values("Cycles", ascending=False).reset_index(drop=True)
 
-functions = avg_all_sorted["Function"].tolist()
-cycles_vals = avg_all_sorted["Cycles"].tolist()
-y_pos = np.arange(len(functions))
-
-fig_width = 8
-fig_height = len(functions) * 0.4 + 1
-fig, ax = plt.subplots(figsize=(fig_width, fig_height))
-
-for i, func in enumerate(functions):
-    ax.barh(
-        y_pos[i],
-        cycles_vals[i],
-        color=func_to_color[func],
-        edgecolor="black"
-    )
-
-max_cycles = max(cycles_vals)
-ax.set_xlim(0, max_cycles * 1.15)
-
-for i, val in enumerate(cycles_vals):
-    ax.text(
-        val * 1.005,
-        i,
-        f"{int(round(val, 0))}",
-        va="center",
-        ha="left",
-        fontsize=9
-    )
+fig, ax = plt.subplots(figsize=(6, len(avg_all_sorted) * 0.4 + 1))
+y_pos = np.arange(len(avg_all_sorted))
+ax.barh(y_pos, avg_all_sorted["Cycles"], color="C1", edgecolor="black")
+for i, val in enumerate(avg_all_sorted["Cycles"]):
+    ax.text(val * 1.005, i, f"{int(round(val, 0))}", va="center", ha="left", fontsize=9)
 
 ax.set_yticks(y_pos)
 ax.set_yticklabels(functions, fontsize=9)
