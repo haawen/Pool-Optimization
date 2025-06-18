@@ -1,4 +1,3 @@
-#include "pool.h"
 #include "pool_spmd.h"
 
 #include <emmintrin.h>
@@ -13,28 +12,6 @@
 #include <windows.h>
 #else
 #include <x86intrin.h>
-#endif
-
-static inline void start_profiling_section(Profile *profile)
-{
-    profile->cycle_start = start_tsc();
-}
-
-static inline void end_profiling_section(Profile *profile)
-{
-    profile->cycles_cumulative += stop_tsc(profile->cycle_start);
-}
-
-#ifdef PROFILE
-
-#define START_PROFILE(profile) start_profiling_section(profile)
-#define END_PROFILE(profile) end_profiling_section(profile)
-
-#else
-
-#define START_PROFILE(profile)
-#define END_PROFILE(profile)
-
 #endif
 
 DLL_EXPORT void spmd_4x_linear(
@@ -60,17 +37,15 @@ DLL_EXPORT void spmd_4x_linear(
     Profile *profiles, Branch *branches)
 {
 #ifdef PROFILE
-    Profile dummy_profile[6];
-    Profile *complete_function = &dummy_profile[0];
+    uint64_t tsc_start = start_tsc();
 #endif
-    START_PROFILE(complete_function);
     collide_balls(col1_rvw1, col1_rvw2, R, M, u_s1, u_s2, col1_u_b, e_b, deltaP, N, col1_rvw1_result, col1_rvw2_result, profiles, branches);
     collide_balls(col2_rvw1, col2_rvw2, R, M, u_s1, u_s2, col2_u_b, e_b, deltaP, N, col2_rvw1_result, col2_rvw2_result, profiles, branches);
     collide_balls(col3_rvw1, col3_rvw2, R, M, u_s1, u_s2, col3_u_b, e_b, deltaP, N, col3_rvw1_result, col3_rvw2_result, profiles, branches);
     collide_balls(col4_rvw1, col4_rvw2, R, M, u_s1, u_s2, col4_u_b, e_b, deltaP, N, col4_rvw1_result, col4_rvw2_result, profiles, branches);
-    END_PROFILE(complete_function);
 #ifdef PROFILE
-    profiles[0] = dummy_profile[0];
+    uint64_t elapsed = stop_tsc(tsc_start);
+    profiles->cycles_cumulative = elapsed;
 #endif
 }
 
@@ -97,17 +72,15 @@ DLL_EXPORT void spmd_4x_recip_sqrt(
     Profile *profiles, Branch *branches)
 {
 #ifdef PROFILE
-    Profile dummy_profile[6];
-    Profile *complete_function = &dummy_profile[0];
+    uint64_t tsc_start = start_tsc();
 #endif
-    START_PROFILE(complete_function);
     recip_sqrt(col1_rvw1, col1_rvw2, R, M, u_s1, u_s2, col1_u_b, e_b, deltaP, N, col1_rvw1_result, col1_rvw2_result, profiles, branches);
     recip_sqrt(col2_rvw1, col2_rvw2, R, M, u_s1, u_s2, col2_u_b, e_b, deltaP, N, col2_rvw1_result, col2_rvw2_result, profiles, branches);
     recip_sqrt(col3_rvw1, col3_rvw2, R, M, u_s1, u_s2, col3_u_b, e_b, deltaP, N, col3_rvw1_result, col3_rvw2_result, profiles, branches);
     recip_sqrt(col4_rvw1, col4_rvw2, R, M, u_s1, u_s2, col4_u_b, e_b, deltaP, N, col4_rvw1_result, col4_rvw2_result, profiles, branches);
-    END_PROFILE(complete_function);
 #ifdef PROFILE
-    profiles[0] = dummy_profile[0];
+    uint64_t elapsed = stop_tsc(tsc_start);
+    profiles[0].cycles_cumulative = elapsed;
 #endif
 }
 

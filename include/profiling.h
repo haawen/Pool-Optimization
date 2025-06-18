@@ -2,7 +2,7 @@
 #define PROFILING_H
 
 #define WARMUP 100
-#define ITERATIONS 500
+#define ITERATIONS 10000
 #define TEST_RUNNER_ITERATIONS 3      // Rerun all TestCases (so warmup + iterations) in Random Order
 #define FLUSH_SIZE (32 * 1024 * 1024) // 32MB buffer
 

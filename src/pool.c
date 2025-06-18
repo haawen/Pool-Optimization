@@ -91,40 +91,6 @@ double *get_angular_velocity(double *rvw)
     return &rvw[6];
 }
 
-void init_profiling_section(Profile *profile)
-{
-    profile->cycle_start = 0;
-    profile->cycles_cumulative = 0;
-    profile->flops = 0;
-    profile->memory = 0;
-    profile->ADDS = 0;
-    profile->MULS = 0;
-    profile->DIVS = 0;
-    profile->SQRT = 0;
-}
-
-static inline void start_profiling_section(Profile *profile)
-{
-    profile->cycle_start = start_tsc();
-}
-
-static inline void end_profiling_section(Profile *profile)
-{
-    profile->cycles_cumulative += stop_tsc(profile->cycle_start);
-}
-
-#ifdef PROFILE
-
-#define START_PROFILE(profile) start_profiling_section(profile)
-#define END_PROFILE(profile) end_profiling_section(profile)
-
-#else
-
-#define START_PROFILE(profile)
-#define END_PROFILE(profile)
-
-#endif
-
 myInt64 python_start_tsc()
 {
     return start_tsc();
@@ -3218,7 +3184,7 @@ FLOPS(1, 0, 0, 0, complete_function);
         u_int64_t vel2_zero = -(u_int64_t)(surface_velocity_x_2 == 0.0 && surface_velocity_y_2 == 0.0);
 FLOPS(1, 0, 0, 0, complete_function);
         // Zero only if deltaP_2.d > 0.0 and vel2_zero is true
-        u_int64_t mask2_zero = is_pos & vel2_zero;
+        uint64_t mask2_zero = is_pos & vel2_zero;
         deltaP_x_2.u &= ~mask2_zero;
         deltaP_y_2.u &= ~mask2_zero;
 
@@ -3226,7 +3192,7 @@ FLOPS(1, 0, 0, 0, complete_function);
         u_int64_t vel1_zero = -(u_int64_t)(surface_velocity_x_1 == 0.0 && surface_velocity_y_1 == 0.0);
 FLOPS(1, 0, 0, 0, complete_function);
         // Zero only if deltaP_2.d <= 0.0 and vel1_zero is true
-        u_int64_t mask1_zero = is_neg & vel1_zero;
+        uint64_t mask1_zero = is_neg & vel1_zero;
         deltaP_x_1.u &= ~mask1_zero;
         deltaP_y_1.u &= ~mask1_zero;
 
