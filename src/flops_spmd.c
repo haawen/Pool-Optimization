@@ -52,7 +52,7 @@ void call_function(const char *name, CollideBallsFnSPMD collide_fn)
     }
 
     Profile profiles[6];
-    // Branch branches[12] = {0};
+    Branch branches[12] = {0};
 
     // for (int i = 0; i < TEST_CASES; i++)
     // {
@@ -69,7 +69,6 @@ void call_function(const char *name, CollideBallsFnSPMD collide_fn)
     {
         init_profiling_section(&profiles[p]);
     }
-
     collide_fn(
         reference.col1_rvw1,
         reference.col1_rvw2,
@@ -99,8 +98,7 @@ void call_function(const char *name, CollideBallsFnSPMD collide_fn)
         col4_rvw1_result,
         col4_rvw2_result,
         profiles,
-        NULL);
-
+        branches);
     fprintf(csv, "%s,%s,%ld,%ld,%ld,%ld,%ld,%ld\n", name, "collide_balls", profiles[0].flops, profiles[0].memory * sizeof(double), profiles[0].ADDS, profiles[0].MULS, profiles[0].DIVS, profiles[0].SQRT);
     fprintf(csv, "%s,%s,%ld,%ld,%ld,%ld,%ld,%ld\n", name, "Initialization", profiles[1].flops, profiles[1].memory * sizeof(double), profiles[1].ADDS, profiles[1].MULS, profiles[1].DIVS, profiles[1].SQRT);
     fprintf(csv, "%s,%s,%ld,%ld,%ld,%ld,%ld,%ld\n", name, "Impulse", profiles[2].flops, profiles[2].memory * sizeof(double), profiles[2].ADDS, profiles[2].MULS, profiles[2].DIVS, profiles[2].SQRT);

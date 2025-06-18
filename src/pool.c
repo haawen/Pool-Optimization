@@ -102,40 +102,6 @@ double *get_angular_velocity(double *rvw)
     return &rvw[6];
 }
 
-void init_profiling_section(Profile *profile)
-{
-    profile->cycle_start = 0;
-    profile->cycles_cumulative = 0;
-    profile->flops = 0;
-    profile->memory = 0;
-    profile->ADDS = 0;
-    profile->MULS = 0;
-    profile->DIVS = 0;
-    profile->SQRT = 0;
-}
-
-static inline void start_profiling_section(Profile *profile)
-{
-    profile->cycle_start = start_tsc();
-}
-
-static inline void end_profiling_section(Profile *profile)
-{
-    profile->cycles_cumulative += stop_tsc(profile->cycle_start);
-}
-
-#ifdef PROFILE
-
-#define START_PROFILE(profile) start_profiling_section(profile)
-#define END_PROFILE(profile) end_profiling_section(profile)
-
-#else
-
-#define START_PROFILE(profile)
-#define END_PROFILE(profile)
-
-#endif
-
 myInt64 python_start_tsc()
 {
     return start_tsc();

@@ -38,6 +38,7 @@ add_library(pool_shared SHARED ${SOURCES})
 target_compile_options(pool_shared PRIVATE ${FLAGS})
 
 include_directories(${UNITY_DIR})
+
 add_executable(profiling src/profiling.c ${SOURCES} ${UNITY_DIR}/unity.c)
 target_compile_definitions(profiling PRIVATE PROFILE)
 target_compile_options(profiling PRIVATE ${FLAGS})
@@ -68,6 +69,11 @@ add_custom_target(collide_balls_asm
 )
 
 # SPMD compilations
+add_executable(spmd_profiling src/profiling_spmd.c ${SOURCES} src/pool_spmd.c ${UNITY_DIR}/unity.c)
+target_compile_definitions(spmd_profiling PRIVATE PROFILE)
+target_compile_options(spmd_profiling PRIVATE ${FLAGS})
+target_compile_definitions(spmd_profiling PRIVATE UNITY_INCLUDE_DOUBLE)
+
 add_executable(spmd_benchmark src/profiling_spmd.c ${SOURCES} src/pool_spmd.c ${UNITY_DIR}/unity.c)
 target_compile_options(spmd_benchmark PRIVATE ${FLAGS} -g)
 target_compile_definitions(spmd_benchmark PRIVATE UNITY_INCLUDE_DOUBLE)
