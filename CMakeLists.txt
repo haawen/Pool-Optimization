@@ -23,7 +23,7 @@ set(FLAGS
     -mavx2
     -Ofast
     # #-march=native # unpredictable, most of the times worsens
-    -Wall
+    # -Wall
     # -pedantic
     -fno-math-errno
     -funroll-loops

@@ -2252,7 +2252,7 @@ DLL_EXPORT void recip_sqrt_masks(double *restrict rvw1, double *restrict rvw2, f
         deltaP_x_1.d = u_s1 * surface_velocity_x_1 * inv_sv1 * deltaP_2.d;
         deltaP_y_1.d = u_s1 * surface_velocity_y_1 * inv_sv1 * deltaP_2.d;
 
-        u_int64_t mask = -(u_int64_t)(fabs(contact_point_velocity_z) >= 1e-16);
+        uint64_t mask = -(uint64_t)(fabs(contact_point_velocity_z) >= 1e-16);
         deltaP_2.u &= mask;
         deltaP_x_1.u &= mask;
         deltaP_y_1.u &= mask;
@@ -2260,8 +2260,8 @@ DLL_EXPORT void recip_sqrt_masks(double *restrict rvw1, double *restrict rvw2, f
         deltaP_y_2.u &= mask;
 
         // Replace: if (deltaP_2.d > 0.0)
-        u_int64_t is_pos = -(u_int64_t)(deltaP_2.d > 0.0);
-        u_int64_t is_neg = ~is_pos;
+        uint64_t is_pos = -(uint64_t)(deltaP_2.d > 0.0);
+        uint64_t is_neg = ~is_pos;
 
         // If deltaP_2.d > 0.0, zero deltaP_x/y_1.d
         deltaP_x_1.u &= ~is_pos;
@@ -2272,16 +2272,16 @@ DLL_EXPORT void recip_sqrt_masks(double *restrict rvw1, double *restrict rvw2, f
         deltaP_y_2.u &= ~is_neg;
 
         // Check (surface_velocity_x_2 == 0.0 && surface_velocity_y_2 == 0)
-        u_int64_t vel2_zero = -(u_int64_t)(surface_velocity_x_2 == 0.0 && surface_velocity_y_2 == 0.0);
+        uint64_t vel2_zero = -(uint64_t)(surface_velocity_x_2 == 0.0 && surface_velocity_y_2 == 0.0);
         // Zero only if deltaP_2.d > 0.0 and vel2_zero is true
-        u_int64_t mask2_zero = is_pos & vel2_zero;
+        uint64_t mask2_zero = is_pos & vel2_zero;
         deltaP_x_2.u &= ~mask2_zero;
         deltaP_y_2.u &= ~mask2_zero;
 
         // Check (surface_velocity_x_1 == 0.0 && surface_velocity_y_1 == 0.0)
-        u_int64_t vel1_zero = -(u_int64_t)(surface_velocity_x_1 == 0.0 && surface_velocity_y_1 == 0.0);
+        uint64_t vel1_zero = -(uint64_t)(surface_velocity_x_1 == 0.0 && surface_velocity_y_1 == 0.0);
         // Zero only if deltaP_2.d <= 0.0 and vel1_zero is true
-        u_int64_t mask1_zero = is_neg & vel1_zero;
+        uint64_t mask1_zero = is_neg & vel1_zero;
         deltaP_x_1.u &= ~mask1_zero;
         deltaP_y_1.u &= ~mask1_zero;
 
