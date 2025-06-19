@@ -132,6 +132,8 @@ int main()
     call_function("4x Basic Implementation", spmd_4x_linear);
     call_function("4x Recip Sqrt Implementation", spmd_4x_recip_sqrt);
     call_function("SPMD Basic Implementation", spmd_basic_collide_balls);
+    call_function("SPMD 2: FMA", spmd2_FMA);
+    call_function("SPMD 3: Recip Sqrt", spmd3_Recip_Sqrt);
 
     return 0;
 }

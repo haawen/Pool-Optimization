@@ -282,6 +282,16 @@ void test_spmd_basic(void)
     call_function("SPMD Basic Implementation", spmd_basic_collide_balls);
 }
 
+void test_spmd2_FMA(void)
+{
+    call_function("SPMD 2: FMA", spmd2_FMA);
+}
+
+void test_spmd3_recip_sqrt(void)
+{
+    call_function("SPMD 3: Recip Sqrt", spmd3_Recip_Sqrt);
+}
+
 int main()
 {
 #ifdef _WIN32
@@ -308,12 +318,16 @@ int main()
         test_collide_balls_basic,
         test_collide_balls_recip_sqrt,
         test_spmd_basic,
+        test_spmd2_FMA,
+        test_spmd3_recip_sqrt,
     };
 
     const char *function_names[] = {
         "4x Basic Implementation",
         "4x Recip Sqrt Implementation",
-        "SPMD Basic Implementation",
+        "SPMD: Basic Implementation",
+        "SPMD 2: FMA",
+        "SPMD 3: Recip Sqrt",
     };
 
 #define NUM_FUNCTIONS (sizeof(tests) / sizeof(tests[0]))

@@ -83,12 +83,26 @@ add_executable(spmd_benchmark src/profiling_spmd.c ${SOURCES} src/pool_spmd.c ${
 target_compile_options(spmd_benchmark PRIVATE ${FLAGS} -g)
 target_compile_definitions(spmd_benchmark PRIVATE UNITY_INCLUDE_DOUBLE)
 
+add_executable(spmd_benchmark_n src/profiling_multiple_n_spmd.c ${SOURCES} src/pool_spmd.c ${UNITY_DIR}/unity.c)
+target_compile_options(spmd_benchmark_n PRIVATE ${FLAGS} -g)
+target_compile_definitions(spmd_benchmark_n PRIVATE UNITY_INCLUDE_DOUBLE)
+
 add_executable(spmd_single_performance src/single_performance_spmd.c ${SOURCES} src/pool_spmd.c)
 target_compile_options(spmd_single_performance PRIVATE ${FLAGS} -g)
 
 add_executable(spmd_flops src/flops_spmd.c ${SOURCES} src/pool_spmd.c)
 target_compile_options(spmd_flops PRIVATE ${FLAGS})
 target_compile_definitions(spmd_flops PRIVATE PROFILE FLOP_COUNT)
+
+add_custom_target(spmd_collide_balls_asm
+  COMMAND ${CMAKE_C_COMPILER}
+          ${FLAGS}
+          -I${CMAKE_SOURCE_DIR}/include
+          -I${CMAKE_SOURCE_DIR}/${UNITY_DIR}
+          -S
+          -o ${CMAKE_BINARY_DIR}/pool_spmd.s
+          ${CMAKE_SOURCE_DIR}/src/pool_spmd.c
+)
 
 if(UNIX)
     target_link_libraries(pool_shared m)
