@@ -677,7 +677,6 @@ if flops_df["Test Case"].dtype != object:
     flops_df["Test Case"] = "TC " + flops_df["Test Case"].astype(str)
 
 flops_df = flops_df[flops_df["Section"] == "collide_balls"]
-print(flops_df)
 
 prof_df = pd.read_csv("build/benchmark.csv")
 if prof_df["Test Case"].dtype != object:
@@ -830,6 +829,423 @@ ax.xaxis.grid(which="major", linestyle="--", linewidth=0.5, alpha=0.7)
 plt.tight_layout()
 plt.savefig("plots/flops_per_cycle_avg_all_cases.png", dpi=150)
 plt.close(fig)
+
+
+################## BRANCH MISS PLOTS ###################
+
+branch_miss_percent = {
+    "Initial C": 0.11,  # 438 769
+    "Precompute": 0.10,  # 434,184
+    "RSQRT": 0.09,  # 347,270
+    "Bitwise Masks": 0.21,  # 498,347
+    "SIMD Overhaul": 0.34,  # 429,743
+    "RSQRT Double While": 0.11,  # 342,229
+    "FMA": 0.11,  # 459,489
+    "SIMD": 0.43,  # 555,843
+}
+
+branch_miss_absolut = {
+    "Initial C": 438769,
+    "Precompute": 434184,
+    "RSQRT": 347270,
+    "Bitwise Masks": 498347,
+    "SIMD Overhaul": 429743,
+    "RSQRT Double While": 342229,
+    "FMA": 459489,
+    "SIMD": 555843,
+}
+
+sorted_funcs_values = sorted(
+    branch_miss_absolut.items(), key=lambda item: item[1], reverse=True
+)
+funcs = [func for func, val in sorted_funcs_values]
+values = [(int)(val) for func, val in sorted_funcs_values]
+# funcs = branch_miss_absolut.keys()
+# values = list(branch_miss_absolut.values())
+y_pos = np.arange(len(funcs))
+
+fig_width = 9.4
+fig_height = len(funcs) * 0.4 + 1
+fig, ax = plt.subplots(figsize=(fig_width, fig_height))
+
+for i, func in enumerate(funcs):
+    ax.barh(
+        y_pos[i],
+        values[i],
+        color=func_to_color_fp[func],
+        edgecolor="black",
+        height=0.8,
+    )
+
+max_val = max(values)
+ax.set_xlim(0, max_val * 1.15)
+
+for i, val in enumerate(values):
+    ax.text(
+        val * 1.005,
+        i,
+        f"{val}",
+        va="center",
+        ha="left",
+        fontsize=14,
+        fontweight="bold",
+    )
+
+ax.set_yticks(y_pos)
+ax.set_yticklabels(funcs, fontsize=14, fontweight="bold")
+ax.invert_yaxis()
+
+# ─── Remove the thousands_formatter ────────────────────────────────────────
+# Just let Matplotlib use the default float formatting:
+# ax.xaxis.set_major_formatter(ticker.FuncFormatter(thousands_formatter))
+# ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=5, integer=True))
+
+# Optionally, you can set a fixed number of decimal ticks manually, e.g.:
+ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=5, prune="both"))
+# ax.xaxis.set_major_formatter(ticker.FormatStrFormatter("%.2f"))
+
+# ───────────────────────────────────────────────────────────────────────────
+ax.set_title("Branch Misses For 50k Iterations", fontsize=14)
+ax.xaxis.grid(which="major", linestyle="--", linewidth=0.5, alpha=0.7)
+
+plt.tight_layout()
+plt.savefig("plots/branch_misses_absolute.png", dpi=150)
+plt.close(fig)
+
+sorted_funcs_values = sorted(
+    branch_miss_percent.items(), key=lambda item: item[1], reverse=True
+)
+funcs = [func for func, val in sorted_funcs_values]
+values = [val for func, val in sorted_funcs_values]
+# funcs = branch_miss_absolut.keys()
+# values = list(branch_miss_absolut.values())
+y_pos = np.arange(len(funcs))
+
+fig_width = 9.4
+fig_height = len(funcs) * 0.4 + 1
+fig, ax = plt.subplots(figsize=(fig_width, fig_height))
+
+for i, func in enumerate(funcs):
+    ax.barh(
+        y_pos[i],
+        values[i],
+        color=func_to_color_fp[func],
+        edgecolor="black",
+        height=0.8,
+    )
+
+max_val = max(values)
+ax.set_xlim(0, max_val * 1.15)
+
+for i, val in enumerate(values):
+    ax.text(
+        val * 1.005,
+        i,
+        f"{val:.2f}%",
+        va="center",
+        ha="left",
+        fontsize=14,
+        fontweight="bold",
+    )
+
+ax.set_yticks(y_pos)
+ax.set_yticklabels(funcs, fontsize=14, fontweight="bold")
+ax.invert_yaxis()
+
+# ─── Remove the thousands_formatter ────────────────────────────────────────
+# Just let Matplotlib use the default float formatting:
+# ax.xaxis.set_major_formatter(ticker.FuncFormatter(thousands_formatter))
+# ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=5, integer=True))
+
+# Optionally, you can set a fixed number of decimal ticks manually, e.g.:
+ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=5, prune="both"))
+ax.xaxis.set_major_formatter(ticker.FormatStrFormatter("%.2f"))
+
+# ───────────────────────────────────────────────────────────────────────────
+ax.set_title("Relative Branch Misses For 50k Iterations", fontsize=14)
+ax.xaxis.grid(which="major", linestyle="--", linewidth=0.5, alpha=0.7)
+
+plt.tight_layout()
+plt.savefig("plots/branch_misses_percent.png", dpi=150)
+plt.close(fig)
+
+
+################## CACHE MISS PLOTS ###################
+
+branch_miss_percent = {
+    "Initial C": 15.65,  # 438 769
+    "Precompute": 16.66,  # 434,184
+    "RSQRT": 17.44,  # 347,270
+    "Bitwise Masks": 17.08,  # 498,347
+    "SIMD Overhaul": 16.34,  # 429,743
+    "RSQRT Double While": 18.53,  # 342,229
+    "FMA": 18.80,  # 459,489
+    "SIMD": 11.37,  # 555,843
+}
+
+branch_miss_absolut = {
+    "Initial C": 387859,
+    "Precompute": 247851,
+    "RSQRT": 276893,
+    "Bitwise Masks": 240375,
+    "SIMD Overhaul": 226952,
+    "RSQRT Double While": 198975,
+    "FMA": 287762,
+    "SIMD": 317074,
+}
+
+sorted_funcs_values = sorted(
+    branch_miss_absolut.items(), key=lambda item: item[1], reverse=True
+)
+funcs = [func for func, val in sorted_funcs_values]
+values = [(int)(val) for func, val in sorted_funcs_values]
+# funcs = branch_miss_absolut.keys()
+# values = list(branch_miss_absolut.values())
+y_pos = np.arange(len(funcs))
+
+fig_width = 9.4
+fig_height = len(funcs) * 0.4 + 1
+fig, ax = plt.subplots(figsize=(fig_width, fig_height))
+
+for i, func in enumerate(funcs):
+    ax.barh(
+        y_pos[i],
+        values[i],
+        color=func_to_color_fp[func],
+        edgecolor="black",
+        height=0.8,
+    )
+
+max_val = max(values)
+ax.set_xlim(0, max_val * 1.15)
+
+for i, val in enumerate(values):
+    ax.text(
+        val * 1.005,
+        i,
+        f"{val}",
+        va="center",
+        ha="left",
+        fontsize=14,
+        fontweight="bold",
+    )
+
+ax.set_yticks(y_pos)
+ax.set_yticklabels(funcs, fontsize=14, fontweight="bold")
+ax.invert_yaxis()
+
+# ─── Remove the thousands_formatter ────────────────────────────────────────
+# Just let Matplotlib use the default float formatting:
+# ax.xaxis.set_major_formatter(ticker.FuncFormatter(thousands_formatter))
+# ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=5, integer=True))
+
+# Optionally, you can set a fixed number of decimal ticks manually, e.g.:
+ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=5, prune="both"))
+# ax.xaxis.set_major_formatter(ticker.FormatStrFormatter("%.2f"))
+
+# ───────────────────────────────────────────────────────────────────────────
+ax.set_title("Cache Misses For 50k Iterations", fontsize=14)
+ax.xaxis.grid(which="major", linestyle="--", linewidth=0.5, alpha=0.7)
+
+plt.tight_layout()
+plt.savefig("plots/cache_misses_absolute.png", dpi=150)
+plt.close(fig)
+
+sorted_funcs_values = sorted(
+    branch_miss_percent.items(), key=lambda item: item[1], reverse=True
+)
+funcs = [func for func, val in sorted_funcs_values]
+values = [val for func, val in sorted_funcs_values]
+# funcs = branch_miss_absolut.keys()
+# values = list(branch_miss_absolut.values())
+y_pos = np.arange(len(funcs))
+
+fig_width = 9.4
+fig_height = len(funcs) * 0.4 + 1
+fig, ax = plt.subplots(figsize=(fig_width, fig_height))
+
+for i, func in enumerate(funcs):
+    ax.barh(
+        y_pos[i],
+        values[i],
+        color=func_to_color_fp[func],
+        edgecolor="black",
+        height=0.8,
+    )
+
+max_val = max(values)
+ax.set_xlim(0, max_val * 1.15)
+
+for i, val in enumerate(values):
+    ax.text(
+        val * 1.005,
+        i,
+        f"{val:.2f}%",
+        va="center",
+        ha="left",
+        fontsize=14,
+        fontweight="bold",
+    )
+
+ax.set_yticks(y_pos)
+ax.set_yticklabels(funcs, fontsize=14, fontweight="bold")
+ax.invert_yaxis()
+
+# ─── Remove the thousands_formatter ────────────────────────────────────────
+# Just let Matplotlib use the default float formatting:
+# ax.xaxis.set_major_formatter(ticker.FuncFormatter(thousands_formatter))
+# ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=5, integer=True))
+
+# Optionally, you can set a fixed number of decimal ticks manually, e.g.:
+ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=5, prune="both"))
+ax.xaxis.set_major_formatter(ticker.FormatStrFormatter("%.2f"))
+
+# ───────────────────────────────────────────────────────────────────────────
+ax.set_title("Relative Cache Misses For 50k Iterations", fontsize=14)
+ax.xaxis.grid(which="major", linestyle="--", linewidth=0.5, alpha=0.7)
+
+plt.tight_layout()
+plt.savefig("plots/cache_misses_percent.png", dpi=150)
+plt.close(fig)
+
+
+######## MUUUUUUUUUUUUUUUUULTIPLE NNNNNNNNNNNNNNNN###############
+
+
+df = pd.read_csv("build/N.csv")
+avg_cycles = df.groupby(["Function", "N"])[["Cycles"]].mean().reset_index()
+avg_sorted = avg_cycles.sort_values("Cycles", ascending=True).reset_index(drop=True)
+
+unique_N = sorted(avg_cycles["N"].unique())
+
+fig_width = 9.4
+fig_height = len(funcs) * 0.4 + 1
+fig, ax = plt.subplots(figsize=(fig_width, fig_height))
+
+ax.xaxis.grid(which="major", linestyle="--", linewidth=0.5, alpha=0.7)
+ax.yaxis.grid(which="major", linestyle="--", linewidth=0.5, alpha=0.7)
+
+styles = [
+    "--",
+    "-.",
+]
+
+for i, func in enumerate(all_funcs):
+    (line,) = ax.plot(
+        unique_N,
+        avg_cycles[avg_cycles["Function"] == func]["Cycles"],
+        color=func_to_color_fp[func],
+        linewidth=2.5,
+        linestyle=styles[i % len(styles)],
+    )
+
+    N_display_manual = {
+        "Initial C": 6000,  # 438 769
+        "Precompute": 10000,  # 434,184
+        "RSQRT": 10000,  # 347,270
+        "Bitwise Masks": 10000,  # 498,347
+        "SIMD Overhaul": 8000,  # 429,743
+        "RSQRT Double While": 8000,  # 342,229
+        "FMA": 9000,  # 459,489
+        "SIMD": 10000,  # 555,843
+    }
+
+    N_display = N_display_manual[
+        func
+    ]  # unique_N[int(len(unique_N) / len(all_funcs) * i)]
+
+    import matplotlib.patheffects as path_effects
+
+    ax.text(
+        x=N_display,  # Last x-value
+        y=avg_cycles[(avg_cycles["Function"] == func) & (avg_cycles["N"] == N_display)][
+            "Cycles"
+        ].values[-1],
+        s=func,  # Label text
+        color=func_to_color_fp[func],  # Match the line color
+        fontsize=14,
+        fontweight="bold",
+        va="center",
+        ha="left",
+        path_effects=[
+            path_effects.Stroke(linewidth=2, foreground="black"),  # Border
+            path_effects.Normal(),  # Restore normal text rendering on top
+        ],
+    )
+
+plt.tight_layout()
+plt.savefig("plots/N.png", dpi=150)
+plt.close(fig)
+
+
+register_pressure = {
+    "Initial C": 57.47,
+    "Precompute": 57.47,
+    "RSQRT": 95.71,
+    "Bitwise Masks": 92.74,
+    "SIMD Overhaul": 91.35,
+    "RSQRT Double While": 95.60,
+    "FMA": 46.54,
+    "SIMD": 91.75,
+}
+
+sorted_funcs_values = sorted(
+    register_pressure.items(), key=lambda item: item[1], reverse=False
+)
+funcs = [func for func, val in sorted_funcs_values]
+values = [(val) for func, val in sorted_funcs_values]
+# funcs = branch_miss_absolut.keys()
+# values = list(branch_miss_absolut.values())
+y_pos = np.arange(len(funcs))
+
+fig_width = 9.4
+fig_height = len(funcs) * 0.4 + 1
+fig, ax = plt.subplots(figsize=(fig_width, fig_height))
+
+for i, func in enumerate(funcs):
+    ax.barh(
+        y_pos[i],
+        values[i],
+        color=func_to_color_fp[func],
+        edgecolor="black",
+        height=0.8,
+    )
+
+max_val = max(values)
+ax.set_xlim(0, max_val * 1.15)
+
+for i, val in enumerate(values):
+    ax.text(
+        val * 1.005,
+        i,
+        f"{val:.2f}%",
+        va="center",
+        ha="left",
+        fontsize=14,
+        fontweight="bold",
+    )
+
+ax.set_yticks(y_pos)
+ax.set_yticklabels(funcs, fontsize=14, fontweight="bold")
+ax.invert_yaxis()
+
+# ─── Remove the thousands_formatter ────────────────────────────────────────
+# Just let Matplotlib use the default float formatting:
+# ax.xaxis.set_major_formatter(ticker.FuncFormatter(thousands_formatter))
+# ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=5, integer=True))
+
+# Optionally, you can set a fixed number of decimal ticks manually, e.g.:
+ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=5, prune="both"))
+# ax.xaxis.set_major_formatter(ticker.FormatStrFormatter("%.2f"))
+
+# ───────────────────────────────────────────────────────────────────────────
+ax.set_title("Simulated Resource Pressure By LLVM-MCA", fontsize=14)
+ax.xaxis.grid(which="major", linestyle="--", linewidth=0.5, alpha=0.7)
+
+plt.tight_layout()
+plt.savefig("plots/resource_pressure.png", dpi=150)
+plt.close(fig)
+
 
 """
 

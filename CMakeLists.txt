@@ -29,7 +29,7 @@ set(FLAGS
     -funroll-loops
     -ftree-vectorize
     #-fno-omit-frame-pointer
-    
+
     #-flto          # Worsens
     #-g
 )
@@ -44,9 +44,14 @@ target_compile_definitions(profiling PRIVATE PROFILE)
 target_compile_options(profiling PRIVATE ${FLAGS})
 target_compile_definitions(profiling PRIVATE UNITY_INCLUDE_DOUBLE)
 
+
 add_executable(benchmark src/profiling.c ${SOURCES} ${UNITY_DIR}/unity.c)
 target_compile_options(benchmark PRIVATE ${FLAGS} -g)
 target_compile_definitions(benchmark PRIVATE UNITY_INCLUDE_DOUBLE)
+
+add_executable(benchmark_n src/profiling_multiple_n.c ${SOURCES} ${UNITY_DIR}/unity.c)
+target_compile_options(benchmark_n PRIVATE ${FLAGS} -g)
+target_compile_definitions(benchmark_n PRIVATE UNITY_INCLUDE_DOUBLE)
 
 add_executable(single_performance src/single_performance.c ${SOURCES} )
 target_compile_options(single_performance PRIVATE
@@ -88,6 +93,7 @@ target_compile_definitions(spmd_flops PRIVATE PROFILE FLOP_COUNT)
 if(UNIX)
     target_link_libraries(pool_shared m)
     target_link_libraries(profiling m)
+    target_link_libraries(benchmark_n m)
     target_link_libraries(single_performance m)
     target_link_libraries(benchmark m)
     target_link_libraries(flops m)

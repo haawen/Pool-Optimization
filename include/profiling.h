@@ -1,8 +1,8 @@
 #ifndef PROFILING_H
 #define PROFILING_H
 
-#define WARMUP 100
-#define ITERATIONS 10000
+#define WARMUP 10
+#define ITERATIONS 1000
 #define TEST_RUNNER_ITERATIONS 3      // Rerun all TestCases (so warmup + iterations) in Random Order
 #define FLUSH_SIZE (32 * 1024 * 1024) // 32MB buffer
 
@@ -29,6 +29,9 @@ typedef struct
         double angular[3];
     } ball1, ball2;
 } CollisionData;
+
+struct Profile;
+struct Branch;
 
 typedef void (*CollideBallsFn)(double *, double *, float, float, float, float, float, float, float, int, double *, double *, Profile *, Branch *);
 

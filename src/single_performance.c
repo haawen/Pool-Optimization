@@ -124,12 +124,14 @@ int main()
 
     setUp();
 
-    // call_function(collide_balls);
-    // call_function(simple_precompute_cb);
-    // call_function(remove_unused_branches);
-    //
+    call_function(collide_balls);
+    call_function(simple_precompute_cb);
+    call_function(recip_sqrt);
     call_function(recip_sqrt_masks);
-    // call_function(recip_sqrt_double_while);
+    call_function(simd_ssa);
+    call_function(recip_sqrt_double_while);
+    call_function(collide_balls_fma);
+    call_function(simd_collide_balls);
 
     return 0;
 }

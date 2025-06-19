@@ -1934,7 +1934,6 @@ FLOPS(1, 3, 1, 0, complete_function);
     {
         /* -------------------- impulse calculation -------------------- */
         START_PROFILE(impulse);
-FLOPS(2, 0, 0, 0, complete_function);
         if (unlikely(ball_ball_contact_point_magnitude < 1e-16))
         {
             BRANCH(0);
@@ -1959,7 +1958,7 @@ FLOPS(0, 0, 1, 1, complete_function);
             double inv_cbm = (double)r;
 
             inv_cbm = inv_cbm * fma(inv_cbm * inv_cbm, -0.5 * cbm2, 1.5);
-FLOPS(2, 4, 0, 0, complete_function);
+FLOPS(1, 4, 0, 0, complete_function);
             // ------------------------------------------------------------
 
             deltaP_1 = -u_b * deltaP * contact_point_velocity_x * inv_cbm;
@@ -2060,7 +2059,6 @@ FLOPS(2, 1, 0, 0, complete_function);
 
         /* ---- recompute for next iteration ---- */
         START_PROFILE(velocity);
-FLOPS(2, 0, 0, 0, complete_function);
         surface_velocity_x_1 = fma(R, local_angular_velocity_y_1, local_velocity_x_1);
 FLOPS(1, 1, 0, 0, complete_function);
         surface_velocity_y_1 = fma(-R, local_angular_velocity_x_1, local_velocity_y_1);
@@ -2100,7 +2098,6 @@ FLOPS(1, 2, 0, 0, complete_function);
     /* ---------------------- epilogue – UNCHANGED ----------------------- */
     /* ------------------------------------------------------------------ */
     START_PROFILE(after_loop);
-FLOPS(4, 0, 0, 0, complete_function);
 
     rvw1_result[3] = fma(local_velocity_x_1, forward[1], local_velocity_y_1 * forward[0]);
 FLOPS(1, 2, 0, 0, complete_function);
