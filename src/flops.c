@@ -128,12 +128,12 @@ void call_function(const char *name, CollideBallsFn collide_fn)
             profiles,
             branches);
 
-        fprintf(csv, "%s,%s,%d,%ld,%ld,%ld,%ld,%ld,%ld\n", name, "collide_balls", i, profiles[0].flops, profiles[0].memory * sizeof(double), profiles[0].ADDS, profiles[0].MULS, profiles[0].DIVS, profiles[0].SQRT);
-        fprintf(csv, "%s,%s,%d,%ld,%ld,%ld,%ld,%ld,%ld\n", name, "Initialization", i, profiles[1].flops, profiles[1].memory * sizeof(double), profiles[1].ADDS, profiles[1].MULS, profiles[1].DIVS, profiles[1].SQRT);
-        fprintf(csv, "%s,%s,%d,%ld,%ld,%ld,%ld,%ld,%ld\n", name, "Impulse", i, profiles[2].flops, profiles[2].memory * sizeof(double), profiles[2].ADDS, profiles[2].MULS, profiles[2].DIVS, profiles[2].SQRT);
-        fprintf(csv, "%s,%s,%d,%ld,%ld,%ld,%ld,%ld,%ld\n", name, "Delta", i, profiles[3].flops, profiles[3].memory * sizeof(double), profiles[3].ADDS, profiles[3].MULS, profiles[3].DIVS, profiles[3].SQRT);
-        fprintf(csv, "%s,%s,%d,%ld,%ld,%ld,%ld,%ld,%ld\n", name, "Velocity", i, profiles[4].flops, profiles[4].memory * sizeof(double), profiles[4].ADDS, profiles[4].MULS, profiles[4].DIVS, profiles[4].SQRT);
-        fprintf(csv, "%s,%s,%d,%ld,%ld,%ld,%ld,%ld,%ld\n", name, "Transform to World Frame", i, profiles[5].flops, profiles[5].memory * sizeof(double), profiles[5].ADDS, profiles[5].MULS, profiles[5].DIVS, profiles[5].SQRT);
+        fprintf(csv, "\"%s\",%s,%d,%ld,%ld,%ld,%ld,%ld,%ld\n", name, "collide_balls", i, profiles[0].flops, profiles[0].memory * sizeof(double), profiles[0].ADDS, profiles[0].MULS, profiles[0].DIVS, profiles[0].SQRT);
+        fprintf(csv, "\"%s\",%s,%d,%ld,%ld,%ld,%ld,%ld,%ld\n", name, "Initialization", i, profiles[1].flops, profiles[1].memory * sizeof(double), profiles[1].ADDS, profiles[1].MULS, profiles[1].DIVS, profiles[1].SQRT);
+        fprintf(csv, "\"%s\",%s,%d,%ld,%ld,%ld,%ld,%ld,%ld\n", name, "Impulse", i, profiles[2].flops, profiles[2].memory * sizeof(double), profiles[2].ADDS, profiles[2].MULS, profiles[2].DIVS, profiles[2].SQRT);
+        fprintf(csv, "\"%s\",%s,%d,%ld,%ld,%ld,%ld,%ld,%ld\n", name, "Delta", i, profiles[3].flops, profiles[3].memory * sizeof(double), profiles[3].ADDS, profiles[3].MULS, profiles[3].DIVS, profiles[3].SQRT);
+        fprintf(csv, "\"%s\",%s,%d,%ld,%ld,%ld,%ld,%ld,%ld\n", name, "Velocity", i, profiles[4].flops, profiles[4].memory * sizeof(double), profiles[4].ADDS, profiles[4].MULS, profiles[4].DIVS, profiles[4].SQRT);
+        fprintf(csv, "\"%s\",%s,%d,%ld,%ld,%ld,%ld,%ld,%ld\n", name, "Transform to World Frame", i, profiles[5].flops, profiles[5].memory * sizeof(double), profiles[5].ADDS, profiles[5].MULS, profiles[5].DIVS, profiles[5].SQRT);
 
         printf("=== BRANCH PREDICTION ANALYSIS %s TC %d === \n", name, i);
         for (int b = 0; b < 12; b++)
@@ -159,12 +159,12 @@ int main()
     setUp();
 
 
-    call_function("Initial C", collide_balls);
-    call_function("Precompute", simple_precompute_cb);
-    call_function("RSQRT", recip_sqrt);
-    call_function("Bitwise Masks", recip_sqrt_masks);
-    call_function("SIMD Overhaul", simd_ssa);
-    call_function("RSQRT Double While", recip_sqrt_double_while);
+    call_function("Compiler Flags", collide_balls);
+    call_function("Branch, Precompute", simple_precompute_cb);
+    call_function("Best", recip_sqrt);
+    call_function("Bitmasks, FMA, RSQRT", recip_sqrt_masks);
+    call_function("Third SIMD impl.", simd_ssa);
+    call_function("Best with Double While", recip_sqrt_double_while);
     call_function("FMA", collide_balls_fma);
     call_function("SIMD", simd_collide_balls);
 

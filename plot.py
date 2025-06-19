@@ -8,33 +8,6 @@ print(
     "Make sure to have run flops and profiling before plotting. Flops needs only be run when flop count changes."
 )
 
-# dont put dark colors
-color_styles = {
-    "Default": "o",
-    "Basic Implementation": "blue",
-    "Code Motion": "green",
-    "Less SQRT": "purple",
-    "Less SQRT 2": "orchid",
-    "Branch Pred": "grey",
-    "Removed Unused Branches": "#aec6cf",
-    "SIMD": "orange",
-    "Precompute": "gold",
-    "Scalar Improvements": "red",
-    "Scalar Less SQRT": "firebrick",
-    "scalar Less SQRT + Approx": "Cyan",
-    "Approx + Symmetry": "DarkOrange",
-    "Reciprocal Sqrt": "DarkOrange",
-    "Reciprocal Sqrt IF": "black",
-    "Reciprocal Sqrt Less IF": "chocolate",
-    "Full SIMD": "DarkOliveGreen",
-    "SIMD scalar loop": "DarkGoldenRod",
-    "SIMD Optimized Impulse": "DarkViolet",
-    "Improved Symmetry": "DarkSeaGreen",
-    "Register Relieve": "DarkSlateGray",
-    "Reciprocal Sqrt Hoist": "Yellow",
-    "SIMD SSD": "DarkTurquoise",
-}
-
 
 # Make sure the output directory exists
 os.makedirs("plots", exist_ok=True)
@@ -102,7 +75,19 @@ num_funcs = len(all_funcs)
 # If you have >10 functions, it will cycle through.
 cmap = plt.get_cmap("tab10")
 
-func_to_color = {func: cmap(i % cmap.N) for i, func in enumerate(all_funcs)}
+func_to_color_fp = {
+    "Original": cmap(0),
+    "Compiler Flags": cmap(1),  # fresh and readable ✅
+    "Branch, Precompute": cmap(2),  # calm and analytical 📘
+    "Best": cmap(3),  # golden for "best" 🏅
+    "Bitmasks, FMA, RSQRT": cmap(4),  # pretty intense 🌸
+    "Third SIMD impl.": cmap(5),  # vibrant for attention 🍅
+    "Best with Double While": cmap(9),  # fiery and optimized 🔥
+    "FMA": cmap(7),  # deep and technical 💻
+    "SIMD": cmap(8),  # bold and performant 💥
+}
+
+# {func: cmap(i % cmap.N) for i, func in enumerate(all_funcs)}
 
 # (Optional) Print to verify:
 # for func, color in func_to_color.items():
@@ -155,7 +140,9 @@ for tc in all_tcs:
 
     # e) Draw one horizontal bar per function, using its assigned color
     for i, func in enumerate(functions):
-        ax.barh(y_pos[i], cycles_vals[i], color=func_to_color[func], edgecolor="black")
+        ax.barh(
+            y_pos[i], cycles_vals[i], color=func_to_color_fp[func], edgecolor="black"
+        )
 
     # f) Expand the x‐limit to leave room for the right‐hand annotations
     max_cycles = max(cycles_vals)
@@ -189,7 +176,7 @@ for tc in all_tcs:
     # k) Save and close
     outfile = f"plots/benchmark_{tc.replace(' ', '_')}_horizontal.png"
     plt.tight_layout()
-    plt.savefig(outfile, dpi=150)
+    # plt.savefig(outfile, dpi=150)
     plt.close(fig)
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -209,7 +196,7 @@ fig_height = len(functions) * 0.4 + 1
 fig, ax = plt.subplots(figsize=(fig_width, fig_height))
 
 for i, func in enumerate(functions):
-    ax.barh(y_pos[i], cycles_vals[i], color=func_to_color[func], edgecolor="black")
+    ax.barh(y_pos[i], cycles_vals[i], color=func_to_color_fp[func], edgecolor="black")
 
 max_cycles = max(cycles_vals)
 ax.set_xlim(0, max_cycles * 1.15)
@@ -426,7 +413,7 @@ for op in ["ADDS", "MULS", "DIVS", "SQRT"]:
     # 12) Save and close
     outfile = f"plots/Cost_{op}_horizontal.png"
     plt.tight_layout()
-    plt.savefig(outfile, dpi=150)
+    # plt.savefig(outfile, dpi=150)
     plt.close(fig)
 
 
@@ -566,7 +553,7 @@ for func, data in flops.groupby("Function"):
         safe_name = func.replace(" ", "_")
         outfile = f"plots/Cost_{safe_name}_sections_horizontal.png"
         plt.tight_layout()
-        plt.savefig(outfile, dpi=150)
+        # plt.savefig(outfile, dpi=150)
         plt.close(fig)
 
     # --------------------------------------------------------------------------------
@@ -667,7 +654,7 @@ for func, data in flops.groupby("Function"):
     safe_name = func.replace(" ", "_")
     outfile = f"plots/Cost_{safe_name}_Total_horizontal.png"
     plt.tight_layout()
-    plt.savefig(outfile, dpi=150)
+    plt.savefig(outfile, dpi=200)
     plt.close(fig)
 
 # 1) Read in flops.csv and profiling.csv, convert both "Test Case" to "TC X"
@@ -707,7 +694,7 @@ gp = merged.groupby(["Function", "Test Case"])[["FlopsPerCycle"]].mean().reset_i
 # -----------------------------------------------------------------------------
 all_funcs = sorted(gp["Function"].unique())
 cmap = plt.get_cmap("tab10")
-func_to_color_fp = {func: cmap(i % cmap.N) for i, func in enumerate(all_funcs)}
+# func_to_color_fp = {func: cmap(i % cmap.N) for i, func in enumerate(all_funcs)}
 
 
 # 6) Formatter for "k" on the x-axis
@@ -770,7 +757,7 @@ for tc in all_tcs_fp:
 
     outfile = f"plots/flops_per_cycle_{tc.replace(' ', '_')}.png"
     plt.tight_layout()
-    plt.savefig(outfile, dpi=150)
+    # plt.savefig(outfile, dpi=150)
     plt.close(fig)
 
 # 8) Plot "Average FlopsPerCycle across all Test Cases"
@@ -827,30 +814,31 @@ ax.set_title("Mean Flops/Cycle Across 5 Initial Conditions", fontsize=14)
 ax.xaxis.grid(which="major", linestyle="--", linewidth=0.5, alpha=0.7)
 
 plt.tight_layout()
-plt.savefig("plots/flops_per_cycle_avg_all_cases.png", dpi=150)
+plt.savefig("plots/flops_per_cycle_avg_all_cases.png", dpi=200)
 plt.close(fig)
 
 
 ################## BRANCH MISS PLOTS ###################
 
 branch_miss_percent = {
-    "Initial C": 0.11,  # 438 769
-    "Precompute": 0.10,  # 434,184
-    "RSQRT": 0.09,  # 347,270
-    "Bitwise Masks": 0.21,  # 498,347
-    "SIMD Overhaul": 0.34,  # 429,743
-    "RSQRT Double While": 0.11,  # 342,229
+    "Compiler Flags": 0.11,  # 438 769
+    "Branch, Precompute": 0.10,  # 434,184
+    "Best": 0.09,  # 347,270
+    "Bitmasks, FMA, RSQRT": 0.21,  # 498,347
+    "Third SIMD impl.": 0.34,  # 429,743
+    "Best with Double While": 0.11,  # 342,229
     "FMA": 0.11,  # 459,489
     "SIMD": 0.43,  # 555,843
 }
 
+
 branch_miss_absolut = {
-    "Initial C": 438769,
-    "Precompute": 434184,
-    "RSQRT": 347270,
-    "Bitwise Masks": 498347,
-    "SIMD Overhaul": 429743,
-    "RSQRT Double While": 342229,
+    "Compiler Flags": 438769,
+    "Branch, Precompute": 434184,
+    "Best": 347270,
+    "Bitmasks, FMA, RSQRT": 498347,
+    "Third SIMD impl.": 429743,
+    "Best with Double While": 342229,
     "FMA": 459489,
     "SIMD": 555843,
 }
@@ -909,7 +897,7 @@ ax.set_title("Branch Misses For 50k Iterations", fontsize=14)
 ax.xaxis.grid(which="major", linestyle="--", linewidth=0.5, alpha=0.7)
 
 plt.tight_layout()
-plt.savefig("plots/branch_misses_absolute.png", dpi=150)
+plt.savefig("plots/branch_misses_absolute.png", dpi=200)
 plt.close(fig)
 
 sorted_funcs_values = sorted(
@@ -966,30 +954,30 @@ ax.set_title("Relative Branch Misses For 50k Iterations", fontsize=14)
 ax.xaxis.grid(which="major", linestyle="--", linewidth=0.5, alpha=0.7)
 
 plt.tight_layout()
-plt.savefig("plots/branch_misses_percent.png", dpi=150)
+plt.savefig("plots/branch_misses_percent.png", dpi=200)
 plt.close(fig)
 
 
 ################## CACHE MISS PLOTS ###################
 
 branch_miss_percent = {
-    "Initial C": 15.65,  # 438 769
-    "Precompute": 16.66,  # 434,184
-    "RSQRT": 17.44,  # 347,270
-    "Bitwise Masks": 17.08,  # 498,347
-    "SIMD Overhaul": 16.34,  # 429,743
-    "RSQRT Double While": 18.53,  # 342,229
+    "Compiler Flags": 15.65,  # 438 769
+    "Branch, Precompute": 16.66,  # 434,184
+    "Best": 17.44,  # 347,270
+    "Bitmasks, FMA, RSQRT": 17.08,  # 498,347
+    "Third SIMD impl.": 16.34,  # 429,743
+    "Best with Double While": 18.53,  # 342,229
     "FMA": 18.80,  # 459,489
     "SIMD": 11.37,  # 555,843
 }
 
 branch_miss_absolut = {
-    "Initial C": 387859,
-    "Precompute": 247851,
-    "RSQRT": 276893,
-    "Bitwise Masks": 240375,
-    "SIMD Overhaul": 226952,
-    "RSQRT Double While": 198975,
+    "Compiler Flags": 387859,
+    "Branch, Precompute": 247851,
+    "Best": 276893,
+    "Bitmasks, FMA, RSQRT": 240375,
+    "Third SIMD impl.": 226952,
+    "Best with Double While": 198975,
     "FMA": 287762,
     "SIMD": 317074,
 }
@@ -1048,7 +1036,7 @@ ax.set_title("Cache Misses For 50k Iterations", fontsize=14)
 ax.xaxis.grid(which="major", linestyle="--", linewidth=0.5, alpha=0.7)
 
 plt.tight_layout()
-plt.savefig("plots/cache_misses_absolute.png", dpi=150)
+plt.savefig("plots/cache_misses_absolute.png", dpi=200)
 plt.close(fig)
 
 sorted_funcs_values = sorted(
@@ -1105,7 +1093,7 @@ ax.set_title("Relative Cache Misses For 50k Iterations", fontsize=14)
 ax.xaxis.grid(which="major", linestyle="--", linewidth=0.5, alpha=0.7)
 
 plt.tight_layout()
-plt.savefig("plots/cache_misses_percent.png", dpi=150)
+plt.savefig("plots/cache_misses_percent.png", dpi=200)
 plt.close(fig)
 
 
@@ -1140,12 +1128,12 @@ for i, func in enumerate(all_funcs):
     )
 
     N_display_manual = {
-        "Initial C": 6000,  # 438 769
-        "Precompute": 10000,  # 434,184
-        "RSQRT": 10000,  # 347,270
-        "Bitwise Masks": 10000,  # 498,347
-        "SIMD Overhaul": 8000,  # 429,743
-        "RSQRT Double While": 8000,  # 342,229
+        "Compiler Flags": 6000,  # 438 769
+        "Branch, Precompute": 10000,  # 434,184
+        "Best": 10000,  # 347,270
+        "Bitmasks, FMA, RSQRT": 10000,  # 498,347
+        "Third SIMD impl.": 8000,  # 429,743
+        "Best with Double While": 8000,  # 342,229
         "FMA": 9000,  # 459,489
         "SIMD": 10000,  # 555,843
     }
@@ -1174,17 +1162,17 @@ for i, func in enumerate(all_funcs):
     )
 
 plt.tight_layout()
-plt.savefig("plots/N.png", dpi=150)
+plt.savefig("plots/N.png", dpi=200)
 plt.close(fig)
 
 
 register_pressure = {
-    "Initial C": 57.47,
-    "Precompute": 57.47,
-    "RSQRT": 95.71,
-    "Bitwise Masks": 92.74,
-    "SIMD Overhaul": 91.35,
-    "RSQRT Double While": 95.60,
+    "Compiler Flags": 57.47,
+    "Branch, Precompute": 57.47,
+    "Best": 95.71,
+    "Bitmasks, FMA, RSQRT": 92.74,
+    "Third SIMD impl.": 91.35,
+    "Best with Double While": 95.60,
     "FMA": 46.54,
     "SIMD": 91.75,
 }
@@ -1243,7 +1231,7 @@ ax.set_title("Simulated Resource Pressure By LLVM-MCA", fontsize=14)
 ax.xaxis.grid(which="major", linestyle="--", linewidth=0.5, alpha=0.7)
 
 plt.tight_layout()
-plt.savefig("plots/resource_pressure.png", dpi=150)
+plt.savefig("plots/resource_pressure.png", dpi=200)
 plt.close(fig)
 
 

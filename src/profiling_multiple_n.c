@@ -116,7 +116,7 @@ void tearDown(void) {}
 
 void summarize_profile(Profile *profile, const char *func_name, const char *part_name, int test_case, int iteration, int n, FILE *file)
 {
-    fprintf(file, "%s,%s,%d,%d,%llu,%d\n", func_name, part_name, test_case, iteration, profile->cycles_cumulative, n);
+    fprintf(file, "\"%s\",%s,%d,%d,%llu,%d\n", func_name, part_name, test_case, iteration, profile->cycles_cumulative, n);
 }
 
 void flush_cache(void)
@@ -205,7 +205,7 @@ void call_function(const char *name, CollideBallsFn collide_fn)
                 NULL);
 
             myInt64 cycles = stop_tsc(start);
-            fprintf(csv, "%s,%d,%d,%d,%llu\n", name, i, j, N[ni], cycles);
+            fprintf(csv, "\"%s\",%d,%d,%d,%llu\n", name, i, j, N[ni], cycles);
 
         }
     }
@@ -216,7 +216,7 @@ void call_function(const char *name, CollideBallsFn collide_fn)
 
 void test_collide_balls_basic(void)
 {
-    call_function("Initial C", collide_balls);
+    call_function("Compiler Flags", collide_balls);
 }
 
 void test_register_relieve(void)
@@ -226,7 +226,7 @@ void test_register_relieve(void)
 
 void test_precomp(void)
 {
-    call_function("Precompute", simple_precompute_cb);
+    call_function("Branch, Precompute", simple_precompute_cb);
 }
 
 void test_less_sqrt(void)
@@ -268,11 +268,11 @@ void test_approx_sqrt(void)
 }
 void test_recip_sqrt(void)
 {
-    call_function("RSQRT", recip_sqrt);
+    call_function("Best", recip_sqrt);
 }
 
 void test_recip_sqrt_double_while(void) {
-    call_function("RSQRT Double While", recip_sqrt_double_while);
+    call_function("Best with Double While", recip_sqrt_double_while);
 }
 
 void test_recip_sqrt_hoist(void) {
@@ -291,7 +291,7 @@ void test_recip_sqrt_less_ifs(void)
 
 void test_recip_sqrt_masks(void)
 {
-    call_function("Bitwise Masks", recip_sqrt_masks);
+    call_function("Bitmasks, FMA, RSQRT", recip_sqrt_masks);
 }
 
 void test_collide_balls_simd(void)
@@ -319,7 +319,7 @@ void test_improved_symmetry(void)
 
 void test_simd_ssa(void)
 {
-    call_function("SIMD Overhaul", simd_ssa);
+    call_function("Third SIMD impl.", simd_ssa);
 }
 
 void test_fma(void)
