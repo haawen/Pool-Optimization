@@ -189,7 +189,7 @@ void call_function(const char *name, CollideBallsFnSPMD collide_fn)
                 reference.col4_u_b,
                 reference.e_b,
                 0.0f, // deltaP
-                reference.N,
+                N[ni],
                 col1_rvw1_result,
                 col1_rvw2_result,
                 col2_rvw1_result,
