@@ -341,6 +341,7 @@ FLOPS(1, 0, 1, 0, complete_function);
         local_velocity_y_1 += velocity_change_y_1;
         local_velocity_x_2 += velocity_change_x_2;
         local_velocity_y_2 += velocity_change_y_2;
+FLOPS(4, 0, 0, 0, complete_function);
 
         // Angular velocity changes
         double delta_angular_velocity_x_1 = C * (deltaP_2 + deltaP_y_1);
@@ -364,6 +365,7 @@ FLOPS(1, 1, 0, 0, complete_function);
         local_angular_velocity_x_2 += delta_angular_velocity_x_2;
         local_angular_velocity_y_2 += delta_angular_velocity_y_2;
         local_angular_velocity_z_2 += delta_angular_velocity_z_2;
+FLOPS(6, 0, 0, 0, complete_function);
 
         END_PROFILE(delta);
         START_PROFILE(velocity);
@@ -396,7 +398,7 @@ FLOPS(1, 2, 0, 1, complete_function);
         velocity_diff_y = local_velocity_y_2 - local_velocity_y_1;
 FLOPS(1, 0, 0, 0, complete_function);
         total_work += 0.5 * deltaP * fabs(velocity_diff_y_temp + velocity_diff_y);
-FLOPS(1, 2, 0, 0, complete_function);
+FLOPS(2, 2, 0, 0, complete_function);
 
         if (work_compression == 0 && velocity_diff_y > 0)
         {
@@ -416,23 +418,23 @@ FLOPS(1, 2, 0, 0, complete_function);
 
         MEMORY(4, complete_function, after_loop);
         rvw1_result[i + 3] = local_velocity_x_1 * right[i] + local_velocity_y_1 * forward[i];
-FLOPS(2, 2, 0, 0, complete_function);
+FLOPS(1, 2, 0, 0, complete_function);
         rvw2_result[i + 3] = local_velocity_x_2 * right[i] + local_velocity_y_2 * forward[i];
-FLOPS(2, 2, 0, 0, complete_function);
+FLOPS(1, 2, 0, 0, complete_function); //glaub index zählt man nicht die adds
 
         if (i < 2)
         {
             rvw1_result[i + 6] = local_angular_velocity_x_1 * right[i] + local_angular_velocity_y_1 * forward[i];
-FLOPS(2, 2, 0, 0, complete_function);
+FLOPS(1, 2, 0, 0, complete_function);
             rvw2_result[i + 6] = local_angular_velocity_x_2 * right[i] + local_angular_velocity_y_2 * forward[i];
-FLOPS(2, 2, 0, 0, complete_function);
+FLOPS(1, 2, 0, 0, complete_function);
         }
         else
         {
             rvw1_result[i + 6] = local_angular_velocity_z_1;
-FLOPS(1, 0, 0, 0, complete_function);
+//FLOPS(1, 0, 0, 0, complete_function);
             rvw2_result[i + 6] = local_angular_velocity_z_2;
-FLOPS(1, 0, 0, 0, complete_function);
+//FLOPS(1, 0, 0, 0, complete_function);
         }
     }
 
@@ -1816,7 +1818,7 @@ DLL_EXPORT void recip_sqrt(double *restrict rvw1, double *restrict rvw2, float R
 
     double invM = 1.0 / M; /* division → multiply   */
 FLOPS(0, 0, 1, 0, complete_function);
-FLOPS(4, 0, 0, 0, complete_function);
+//FLOPS(4, 0, 0, 0, complete_function); dafak?
     double invR = 1.0 / R;
 FLOPS(0, 0, 1, 0, complete_function);
     double C = 5.0 * invM * invR * 0.5; /* 5/(2MR) */
@@ -1852,7 +1854,7 @@ FLOPS(1, 0, 0, 0, complete_function);
     /* ---------------- velocities to local frame ----------------------- */
     double local_velocity_x_1 = fma(velocity_1[0], forward[1], velocity_1[1] * forward[3]);
 FLOPS(1, 2, 0, 0, complete_function);
-FLOPS(2, 0, 0, 0, complete_function);
+//FLOPS(2, 0, 0, 0, complete_function); walum
     double local_velocity_y_1 = fma(velocity_1[0], forward[0], fma(velocity_1[1], forward[1], velocity_1[2] * forward[2]));
 FLOPS(2, 3, 0, 0, complete_function);
     double local_velocity_x_2 = fma(velocity_2[0], forward[1], velocity_2[1] * forward[3]);
@@ -1863,7 +1865,7 @@ FLOPS(2, 3, 0, 0, complete_function);
     /* --------------- angular velocities to local frame ---------------- */
     double local_angular_velocity_x_1 = fma(angular_velocity_1[0], forward[1], angular_velocity_1[1] * forward[3]);
 FLOPS(1, 2, 0, 0, complete_function);
-FLOPS(2, 0, 0, 0, complete_function);
+//FLOPS(2, 0, 0, 0, complete_function);
     double local_angular_velocity_y_1 = fma(angular_velocity_1[0], forward[0], fma(angular_velocity_1[1], forward[1], angular_velocity_1[2] * forward[2]));
 FLOPS(2, 3, 0, 0, complete_function);
     double local_angular_velocity_z_1 = angular_velocity_1[2];
@@ -1877,7 +1879,7 @@ FLOPS(2, 3, 0, 0, complete_function);
     /* ---------------- surface‑velocity helpers (use fma) -------------- */
     double surface_velocity_x_1 = fma(R, local_angular_velocity_y_1, local_velocity_x_1);
 FLOPS(1, 1, 0, 0, complete_function);
-FLOPS(3, 1, 0, 0, complete_function);
+//FLOPS(3, 1, 0, 0, complete_function);
     double surface_velocity_y_1 = fma(-R, local_angular_velocity_x_1, local_velocity_y_1);
 FLOPS(2, 1, 0, 0, complete_function);
     double surface_velocity_x_2 = fma(R, local_angular_velocity_y_2, local_velocity_x_2);
@@ -1896,7 +1898,7 @@ FLOPS(1, 0, 0, 0, complete_function);
     /* ---------------------- contact point slip ------------------------ */
     double contact_point_velocity_x = fma(-R, (local_angular_velocity_z_1 + local_angular_velocity_z_2), local_velocity_x_1 - local_velocity_x_2);
 FLOPS(4, 1, 0, 0, complete_function);
-FLOPS(2, 0, 0, 0, complete_function);
+//FLOPS(2, 0, 0, 0, complete_function);
     double contact_point_velocity_z = R * (local_angular_velocity_x_1 + local_angular_velocity_x_2);
 FLOPS(1, 1, 0, 0, complete_function);
     double contact_inv_mag = 1.0 / sqrt(fma(contact_point_velocity_x, contact_point_velocity_x, contact_point_velocity_z * contact_point_velocity_z));
@@ -1908,7 +1910,7 @@ FLOPS(0, 0, 1, 0, complete_function);
     /* --------------------------- impulse step ------------------------- */
     double velocity_diff_y = local_velocity_y_2 - local_velocity_y_1;
 FLOPS(1, 0, 0, 0, complete_function);
-FLOPS(2, 0, 0, 0, complete_function);
+//FLOPS(2, 0, 0, 0, complete_function);
 
     if (unlikely(deltaP == 0.0f))
     {
@@ -2075,7 +2077,7 @@ FLOPS(4, 1, 0, 0, complete_function);
 FLOPS(1, 1, 0, 0, complete_function);
 
         contact_inv_mag *= 0.5 * fma(-contact_inv_mag * contact_inv_mag, fma(contact_point_velocity_x, contact_point_velocity_x, contact_point_velocity_z * contact_point_velocity_z), 3.0);
-FLOPS(3, 5, 0, 0, complete_function);
+FLOPS(3, 6, 0, 0, complete_function);
 
         ball_ball_contact_point_magnitude = 1.0 / contact_inv_mag;
 FLOPS(0, 0, 1, 0, complete_function);
