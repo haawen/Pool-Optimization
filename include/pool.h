@@ -2,13 +2,110 @@
 #define POOL_H
 
 #ifdef _WIN32
-    #define DLL_EXPORT __declspec(dllexport)
+#define DLL_EXPORT __declspec(dllexport)
 #else
-    #define DLL_EXPORT
+#define DLL_EXPORT
+#endif
+#ifdef _MSC_VER
+#include <intrin.h>
+#include <windows.h>
+#else
+#include <x86intrin.h>
 #endif
 
+#include <stdint.h>
+#include "tsc_x86.h"
 
-    #include <stdint.h>
+typedef struct
+{
+    myInt64 cycle_start;
+    myInt64 cycles_cumulative;
+    long int flops;  // W
+    long int memory; // Q -> loads and stores
+    long int ADDS;
+    long int MULS;
+    long int DIVS;
+    long int SQRT;
+} Profile;
+
+typedef struct
+{
+    long int count;
+} Branch;
+
+inline void init_profiling_section(Profile *profile)
+{
+    profile->cycle_start = 0;
+    profile->cycles_cumulative = 0;
+    profile->flops = 0;
+    profile->memory = 0;
+    profile->ADDS = 0;
+    profile->MULS = 0;
+    profile->DIVS = 0;
+    profile->SQRT = 0;
+}
+
+inline void start_profiling_section(Profile *profile)
+{
+    profile->cycle_start = start_tsc();
+}
+
+inline void end_profiling_section(Profile *profile)
+{
+    profile->cycles_cumulative += stop_tsc(profile->cycle_start);
+}
+
+#ifdef PROFILE
+
+#define START_PROFILE(profile) start_profiling_section(profile)
+#define END_PROFILE(profile) end_profiling_section(profile)
+
+#else
+
+#define START_PROFILE(profile)
+#define END_PROFILE(profile)
+
+#endif
+
+#ifndef likely
+#define likely(x) __builtin_expect(!!(x), 1)
+#define unlikely(x) __builtin_expect(!!(x), 0)
+#endif
+
+#ifdef FLOP_COUNT
+
+#define FLOPS(adds, muls, divs, sqrt, ...)                             \
+    do                                                                 \
+    {                                                                  \
+        void *arr[] = {__VA_ARGS__};                                   \
+        for (size_t i = 0; i < sizeof(arr) / sizeof(void *); i++)      \
+        {                                                              \
+            ((Profile *)arr[i])->flops += (adds + muls + divs + sqrt); \
+            ((Profile *)arr[i])->ADDS += (adds);                       \
+            ((Profile *)arr[i])->MULS += (muls);                       \
+            ((Profile *)arr[i])->DIVS += (divs);                       \
+            ((Profile *)arr[i])->SQRT += (sqrt);                       \
+        }                                                              \
+    } while (0)
+
+#define MEMORY(count, ...)                                        \
+    do                                                            \
+    {                                                             \
+        void *arr[] = {__VA_ARGS__};                              \
+        for (size_t i = 0; i < sizeof(arr) / sizeof(void *); i++) \
+        {                                                         \
+            ((Profile *)arr[i])->memory += (count);               \
+        }                                                         \
+    } while (0)
+
+#define BRANCH(i) branches[i].count++
+
+#else
+
+#define FLOPS(adds, muls, divs, sqrt, ...)
+#define MEMORY(count, ...)
+#define BRANCH(i)
+#endif
 
 // Class Ball defined
 // https://github.com/ekiefl/pooltool/blob/main/pooltool/objects/ball/datatypes.py#L321
@@ -16,55 +113,51 @@
 // Class BallState
 // https://github.com/ekiefl/pooltool/blob/main/pooltool/objects/ball/datatypes.py#L70
 
-DLL_EXPORT void hello_world(const char* matrix_name, double* rvw);
+DLL_EXPORT myInt64 python_start_tsc();
+DLL_EXPORT myInt64 python_stop_tsc(myInt64 start);
 
-/*
-def collide_balls(
-    rvw1: NDArray[np.float64],
-    rvw2: NDArray[np.float64],
-    R: float,
-    M: float,
-    u_s1: float = 0.21,
-    u_s2: float = 0.21,
-    u_b: float = 0.05,
-    e_b: float = 0.89,
-    deltaP: Optional[float] = None,
-    N: int = 1000,
-) -> Tuple[NDArray[np.float64], NDArray[np.float64]]:
- */
+ DLL_EXPORT myInt64 python_start_tsc();
+ DLL_EXPORT myInt64 python_stop_tsc(myInt64 start);
 
- /*
-    rvw1:
-        Kinematic state of ball 1 (see
-        :class:`pooltool.objects.ball.datatypes.BallState`).
-    rvw2:
-        Kinematic state of ball 2 (see
-        :class:`pooltool.objects.ball.datatypes.BallState`).
-    R: Radius of the balls.
-    M: Mass of the balls.
-    u_s1: Coefficient of sliding friction between ball 1 and the surface.
-    u_s2: Coefficient of sliding friction between ball 2 and the surface.
-    u_b: Coefficient of friction between the balls during collision.
-    e_b: Coefficient of restitution between the balls.
-    deltaP:
-        Normal impulse step size. If not passed, automatically selected according to
-        Equation 14 in the reference.
-    N:
-        If deltaP is not specified, it is calculated such that approximately this
-        number of iterations are performed (see Equation 14 in reference). If deltaP
-        is not None, this does nothing.
- */
-
-DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double* rvw1_result, double* rvw2_result);
+DLL_EXPORT void collide_balls(double* rvw1, double* rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double* rvw1_result, double* rvw2_result, Profile* profiles, Branch* branches);
+DLL_EXPORT void collide_balls_fma(double *rvw1, double *rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double *rvw1_result, double *rvw2_result, Profile *profiles, Branch *branches);
+DLL_EXPORT void scalar_improvements(double* rvw1, double* rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double* rvw1_result, double* rvw2_result, Profile* profiles, Branch* branches);
+DLL_EXPORT void scalar_less_sqrt(double* rvw1, double* rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double* rvw1_result, double* rvw2_result, Profile* profiles, Branch* branches);
+DLL_EXPORT void approxsq_collide_balls(
+    double* rvw1, double* rvw2,
+    float   R, float   M,
+    float   u_s1, float u_s2,
+    float   u_b,  float e_b,
+    float   deltaP,  int N,
+    double* rvw1_result, double* rvw2_result,
+    Profile* profiles,  Branch* branches);
+DLL_EXPORT void recip_sqrt(double* rvw1, double* rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double* rvw1_result, double* rvw2_result, Profile* profiles, Branch* branches);
+DLL_EXPORT void recip_sqrt_masks(double *restrict rvw1, double *restrict rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double *restrict rvw1_result, double *restrict rvw2_result, Profile *profiles, Branch *branches);
+DLL_EXPORT void recip_sqrt_double_while(double* rvw1, double* rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double* rvw1_result, double* rvw2_result, Profile* profiles, Branch* branches);
+DLL_EXPORT void less_sqrt_collide_balls(double* rvw1, double* rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double* rvw1_result, double* rvw2_result, Profile* profiles, Branch* branches);
+DLL_EXPORT void less_sqrt_collide_balls2(double* rvw1, double* rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double* rvw1_result, double* rvw2_result, Profile* profiles, Branch* branches);
+DLL_EXPORT void simple_precompute_cb(double* rvw1, double* rvw2, float Rf, float Mf, float u_s1f, float u_s2f, float u_bf, float e_bf, float deltaPf, int N, double* rvw1_result, double* rvw2_result, Profile* profiles, Branch* branches);
+DLL_EXPORT void branch_prediction_collide_balls(double* rvw1, double* rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double* rvw1_result, double* rvw2_result, Profile* profiles, Branch* branches);
+DLL_EXPORT void remove_unused_branches(double* rvw1, double* rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double* rvw1_result, double* rvw2_result, Profile* profiles, Branch* branches);
+DLL_EXPORT void code_motion_collide_balls(double* rvw1, double* rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double* rvw1_result, double* rvw2_result, Profile* profiles, Branch* branches);
+DLL_EXPORT void code_motion_register_relieve(double* rvw1, double* rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double* rvw1_result, double* rvw2_result, Profile* profiles, Branch* branches);
+DLL_EXPORT void code_motion_collide_balls2(double* rvw1, double* rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double* rvw1_result, double* rvw2_result, Profile* profiles, Branch* branches);
+DLL_EXPORT void simd_collide_balls(double* rvw1, double* rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double* rvw1_result, double* rvw2_result, Profile* profiles, Branch* branches);
+DLL_EXPORT void simd_collide_ball_2(double* rvw1, double* rvw2, float R_float, float M_float, float u_s1_float, float u_s2_float, float u_b_float, float e_b_float, float deltaP_float, int N_int, double* rvw1_result, double* rvw2_result, Profile* profiles, Branch* branches);
+DLL_EXPORT void improved_symmetry_collide_balls(double* rvw1, double* rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double* rvw1_result, double* rvw2_result, Profile* profiles, Branch* branches);
+//DLL_EXPORT void SIMD_Full_basic(double* rvw1, double* rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double* rvw1_result, double* rvw2_result, Profile* profiles, Branch* branches);
+DLL_EXPORT void simd_scalar_loop(double* rvw1, double* rvw2, float R_float, float M_float, float u_s1_float, float u_s2_float, float u_b_float, float e_b_float, float deltaP_float, int N_int, double* rvw1_result, double* rvw2_result, Profile* profiles, Branch* branches);
+DLL_EXPORT void recip_sqrt_hoist(double* rvw1, double* rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double* rvw1_result, double* rvw2_result, Profile* profiles, Branch* branches);
+DLL_EXPORT void simd_ssa(double *restrict rvw1, double *restrict rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double *restrict rvw1_result, double *restrict rvw2_result, Profile *profiles, Branch *branches);
+DLL_EXPORT void recip_sqrt_better_ifs(double *rvw1, double *rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double *rvw1_result, double *rvw2_result, Profile *profiles, Branch *branches);
+DLL_EXPORT void recip_sqrt_less_if(double *rvw1, double *rvw2, float R, float M, float u_s1, float u_s2, float u_b, float e_b, float deltaP, int N, double *rvw1_result, double *rvw2_result, Profile *profiles, Branch *branches);
 
 /* Assuming rvw is row-major (passed from pooltool) */
-double* get_displacement(double* rvw);
+double *get_displacement(double *rvw);
 
 /* Assuming rvw is row-major (passed from pooltool) */
-double* get_velocity(double* rvw);
+double *get_velocity(double *rvw);
 
 /* Assuming rvw is row-major (passed from pooltool) */
-double* get_angular_velocity(double* rvw);
-
-
+double *get_angular_velocity(double *rvw);
 #endif

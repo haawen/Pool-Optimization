@@ -23,6 +23,19 @@ build/*
 
 # Project specific
 pooltool-dev/
+.vscode
+
+uv.lock
+
+plots/*
+!plots/.gitkeep
+
+toolchain.cmake
+.DS_Store
+venv/
+src/pool copy.c
+
+__pycache__/
 .zed/
 
 # Python specific
