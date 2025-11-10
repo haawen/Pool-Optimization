@@ -126,6 +126,18 @@ DLL_EXPORT void collide_balls(double *rvw1, double *rvw2, float R, float M, floa
     double *translation_2 = get_displacement(rvw2);
     double *velocity_2 = get_velocity(rvw2);
     double *angular_velocity_2 = get_angular_velocity(rvw2);
+    // Print initial states
+    /*
+    fprintf(stderr, "C Initial State - Ball 1:\n");
+    fprintf(stderr, "  Position: %.6f %.6f %.6f\n", translation_1[0], translation_1[1], translation_1[2]);
+    fprintf(stderr, "  Velocity: %.6f %.6f %.6f\n", velocity_1[0], velocity_1[1], velocity_1[2]);
+    fprintf(stderr, "  Angular:  %.6f %.6f %.6f\n", angular_velocity_1[0], angular_velocity_1[1], angular_velocity_1[2]);
+
+    fprintf(stderr, "C Initial State - Ball 2:\n");
+    fprintf(stderr, "  Position: %.6f %.6f %.6f\n", translation_2[0], translation_2[1], translation_2[2]);
+    fprintf(stderr, "  Velocity: %.6f %.6f %.6f\n", velocity_2[0], velocity_2[1], velocity_2[2]);
+    fprintf(stderr, "  Angular:  %.6f %.6f %.6f\n", angular_velocity_2[0], angular_velocity_2[1], angular_velocity_2[2]);
+    */
 
     double offset[3];
     subV3(translation_2, translation_1, offset);
@@ -148,6 +160,9 @@ DLL_EXPORT void collide_balls(double *rvw1, double *rvw2, float R, float M, floa
 
     crossV3(forward, up, right);
     FLOPS(3, 6, 0, 0, complete_function);
+    fprintf(stderr, "\nC Local Coordinate System:\n");
+    fprintf(stderr, "  x_loc (right): %.6f %.6f %.6f\n", right[0], right[1], right[2]);
+    fprintf(stderr, "  y_loc (forward): %.6f %.6f %.6f\n", forward[0], forward[1], forward[2]);
 
     // From here on, it is assumed that the x axis is the right axis and y axis is the forward axis
     // Transform velocities to local frame
@@ -160,6 +175,10 @@ DLL_EXPORT void collide_balls(double *rvw1, double *rvw2, float R, float M, floa
     FLOPS(2, 3, 0, 0, complete_function);
     double local_velocity_y_2 = dotV3(velocity_2, forward);
     FLOPS(2, 3, 0, 0, complete_function);
+
+    fprintf(stderr, "\nC Initial Local Velocities:\n");
+    fprintf(stderr, "  Ball 1: v_ix = %.6f, v_iy = %.6f\n", local_velocity_x_1, local_velocity_y_1);
+    fprintf(stderr, "  Ball 2: v_jx = %.6f, v_jy = %.6f\n", local_velocity_x_2, local_velocity_y_2);
 
     // Transform angular velocities into local frame
 
@@ -175,6 +194,10 @@ DLL_EXPORT void collide_balls(double *rvw1, double *rvw2, float R, float M, floa
     FLOPS(2, 3, 0, 0, complete_function);
     double local_angular_velocity_z_2 = dotV3(angular_velocity_2, up);
     FLOPS(2, 3, 0, 0, complete_function);
+
+    fprintf(stderr, "\nC Initial Angular Local Velocities:\n");
+    fprintf(stderr, "  Ball 1: v_ix = %.6f, v_iy = %.6f, v_iy = %.6f\n", local_angular_velocity_x_1, local_angular_velocity_y_1, local_angular_velocity_z_1);
+    fprintf(stderr, "  Ball 2: v_jx = %.6f, v_jy = %.6f, v_jy = %.6f\n", local_angular_velocity_x_2, local_angular_velocity_y_2, local_angular_velocity_z_2);
 
     // Calculate velocity at contact point
     // = Calculate ball-table slips?
@@ -194,6 +217,10 @@ DLL_EXPORT void collide_balls(double *rvw1, double *rvw2, float R, float M, floa
     double surface_velocity_magnitude_2 = sqrt(surface_velocity_x_2 * surface_velocity_x_2 + surface_velocity_y_2 * surface_velocity_y_2);
     FLOPS(1, 2, 0, 1, complete_function);
 
+    fprintf(stderr, "\nC Table Contact Point Velocity Magnitude:\n");
+    fprintf(stderr, "  Ball 1: u_iR_xy_mag= %.6f\n", surface_velocity_magnitude_1);
+    fprintf(stderr, "  Ball 2: u_jR_xy_mag= %.6f\n", surface_velocity_magnitude_2);
+
     // Relative surface velocity in the x-direction at the point where the two balls are in contact.
     // ball-ball slip
     double contact_point_velocity_x = local_velocity_x_1 - local_velocity_x_2 - R * (local_angular_velocity_z_1 + local_angular_velocity_z_2);
@@ -204,6 +231,8 @@ DLL_EXPORT void collide_balls(double *rvw1, double *rvw2, float R, float M, floa
     FLOPS(1, 2, 0, 1, complete_function);
     // printf("\nC Contact Point Slide, Spin:\n");
     // printf("  Contact Point: u_ijC_xz_mag= %.17g\n", ball_ball_contact_point_magnitude);
+    fprintf(stderr, "\nC Contact Point Slide, Spin:\n");
+    fprintf(stderr, "  Contact Point: u_ijC_xz_mag= %.6f\n", ball_ball_contact_point_magnitude);
 
     // Main collision loop
     double velocity_diff_y = local_velocity_y_2 - local_velocity_y_1;
@@ -411,6 +440,11 @@ DLL_EXPORT void collide_balls(double *rvw1, double *rvw2, float R, float M, floa
     }
 
     START_PROFILE(after_loop);
+        /*
+        fprintf(stderr, "\nC DELTA P:\n");
+        fprintf(stderr, "  deltaP_1= %.16f, deltaP_2=%.16f\n", deltaP_1, deltaP_2);
+        fprintf(stderr, "  deltaP_x_1= %.16f, deltaP_y_1=%.16f\n", deltaP_x_1, deltaP_y_1);
+        fprintf(stderr, "  deltaP_x_2= %.16f, deltaP_y_2=%.16f\n", deltaP_x_2, deltaP_y_2);
 
     // Transform back to global coordinates
     for (int i = 0; i < 3; i++)
@@ -739,6 +773,9 @@ DLL_EXPORT void collide_balls_fma(double *rvw1, double *rvw2, float R, float M, 
         FLOPS(1, 0, 0, 0, complete_function);
         total_work = fma(fabs(velocity_diff_y_temp + velocity_diff_y), 0.5 * deltaP, total_work);
         FLOPS(2, 2, 0, 0, complete_function);
+    fprintf(stderr, "\nC Final Local Velocities:\n");
+    fprintf(stderr, "  Ball 1: v_ix = %.6f, v_iy = %.6f\n", local_velocity_x_1, local_velocity_y_1);
+    fprintf(stderr, "  Ball 2: v_jx = %.6f, v_jy = %.6f\n", local_velocity_x_2, local_velocity_y_2);
 
         if (work_compression == 0 && velocity_diff_y > 0)
         {
@@ -749,6 +786,9 @@ DLL_EXPORT void collide_balls_fma(double *rvw1, double *rvw2, float R, float M, 
 
         END_PROFILE(velocity);
     }
+    fprintf(stderr, "\nC Final local Angular Velocities:\n");
+    fprintf(stderr, "  Ball 1: %.6f %.6f %.6f\n", local_angular_velocity_x_1, local_angular_velocity_y_1, local_angular_velocity_z_1);
+    fprintf(stderr, "  Ball 2: %.6f %.6f %.6f\n", local_angular_velocity_x_2, local_angular_velocity_y_2, local_angular_velocity_z_2);
 
     START_PROFILE(after_loop);
 
@@ -805,6 +845,15 @@ DLL_EXPORT void scalar_improvements(double *restrict rvw1, double *restrict rvw2
     double *translation_2 = get_displacement(rvw2);
     double *velocity_2 = get_velocity(rvw2);
     double *angular_velocity_2 = get_angular_velocity(rvw2);
+    fprintf(stderr, "\nC Final Global Velocities:\n");
+    fprintf(stderr, "  Ball 1: %.6f %.6f %.6f\n", rvw1_result[3], rvw1_result[4], rvw1_result[5]);
+    fprintf(stderr, "  Ball 2: %.6f %.6f %.6f\n", rvw2_result[3], rvw2_result[4], rvw2_result[5]);
+
+    fprintf(stderr, "\nC Final Global Angular Velocities:\n");
+    fprintf(stderr, "  Ball 1: %.6f %.6f %.6f\n", rvw1_result[6], rvw1_result[7], rvw1_result[8]);
+    fprintf(stderr, "  Ball 2: %.6f %.6f %.6f\n", rvw2_result[6], rvw2_result[7], rvw2_result[8]);
+
+    fprintf(stderr, "\n=== End C Implementation ===\n");
 
     /* ------------------------------------------------------------------ */
     /* ----------------------   scalar tweaks   -------------------------- */

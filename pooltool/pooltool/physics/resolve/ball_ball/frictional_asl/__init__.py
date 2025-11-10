@@ -24,6 +24,8 @@ if platform.system() == "Windows":
     LIBRARY_PATH = r"..\build\libpool_shared.dll"
 elif platform.system() == "Linux":
     LIBRARY_PATH = "../build/libpool_shared.so"
+elif platform.system() == "Darwin":  # macOS
+    LIBRARY_PATH = "../build/libpool_shared.dylib"
 else:
     raise NotImplementedError("Please add the path to your system")
 

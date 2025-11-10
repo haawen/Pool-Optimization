@@ -1,8 +1,27 @@
-.cache/*
+# Build directories
 build/*
+**/build/
 !build/.gitkeep
 
-.zed
+# Cache and temporary files
+.cache/*
+**/.cache/
+*.o
+*.so
+*.dylib
+*.a
+*.exe
+*.out
+*.app
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Project specific
 pooltool-dev/
 .vscode
 
@@ -17,3 +36,30 @@ venv/
 src/pool copy.c
 
 __pycache__/
+.zed/
+
+# Python specific
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+env/
+venv/
+.env
+.venv
+ENV/
+
+# CMake specific
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+Testing/
+Makefile
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+_deps/
+
+# Ignore build directories
+benchmark/build/
